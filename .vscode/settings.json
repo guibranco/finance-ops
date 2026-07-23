@@ -1,0 +1,35 @@
+{
+    "snyk.advanced.autoSelectOrganization": true,
+    "sonarlint.connectedMode.project": {
+        "connectionId": "guibranco",
+        "projectKey": "guibranco_finance-ops"
+    },
+    "sarif-viewer.connectToGithubCodeScanning": "on",
+    "workbench.colorCustomizations": {
+        "activityBar.activeBackground": "#e330ed",
+        "activityBar.background": "#e330ed",
+        "activityBar.foreground": "#e7e7e7",
+        "activityBar.inactiveForeground": "#e7e7e799",
+        "activityBarBadge.background": "#585408",
+        "activityBarBadge.foreground": "#e7e7e7",
+        "activityBarTop.activeBackground": "#e330ed",
+        "activityBarTop.background": "#e330ed",
+        "activityBarTop.foreground": "#e7e7e7",
+        "activityBarTop.inactiveForeground": "#e7e7e799",
+        "commandCenter.border": "#e7e7e799",
+        "commandCenter.foreground": "#e7e7e7",
+        "sash.hoverBorder": "#e330ed",
+        "statusBar.background": "#cd13d7",
+        "statusBar.debuggingBackground": "#cd13d7",
+        "statusBar.debuggingForeground": "#e7e7e7",
+        "statusBar.foreground": "#e7e7e7",
+        "statusBarItem.hoverBackground": "#e330ed",
+        "statusBarItem.remoteBackground": "#cdc312",
+        "statusBarItem.remoteForeground": "#e7e7e7",
+        "titleBar.activeBackground": "#cd13d7",
+        "titleBar.activeForeground": "#e7e7e7",
+        "titleBar.inactiveBackground": "#cd13d799",
+        "titleBar.inactiveForeground": "#e7e7e799"
+    },
+    "peacock.color": "#cd13d7"
+}
