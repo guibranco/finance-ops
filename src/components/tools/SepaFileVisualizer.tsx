@@ -417,7 +417,7 @@ export default function SepaFileVisualizer() {
       }
       return true
     })
-  }, [active, search, seqFilter, groupFilter])
+  }, [active, columns, search, seqFilter, groupFilter])
 
   const sortedTransactions = useMemo(() => {
     const rows = [...filteredTransactions]
