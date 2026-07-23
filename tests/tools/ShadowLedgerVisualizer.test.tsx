@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
-import ShadowLedgerVisualizer from '../../src/components/tools/ShadowLedgerVisualizer.jsx'
+import ShadowLedgerVisualizer from '../../src/components/tools/ShadowLedgerVisualizer.tsx'
 
 // ── Fixtures ───────────────────────────────────────────────────────────────
 const BALANCED_ENTRIES = {
@@ -19,7 +19,7 @@ const UNBALANCED_ENTRIES = {
   isTruncated: true,
 }
 
-const visualize = (payload) => {
+const visualize = (payload: unknown) => {
   fireEvent.change(screen.getByPlaceholderText(/shadow ledger entries json payload/i), {
     target: { value: typeof payload === 'string' ? payload : JSON.stringify(payload) },
   })
@@ -41,7 +41,7 @@ describe('ShadowLedgerVisualizer', () => {
   it('shows an error for malformed JSON', () => {
     render(<ShadowLedgerVisualizer />)
     visualize('{ bad json }')
-    expect(document.querySelector('.alert-error')).not.toBeNull()
+    expect(document.querySelector('[data-testid="alert-error"]')).not.toBeNull()
   })
 
   it('shows an error when the JSON has no entries array', () => {
@@ -102,7 +102,7 @@ describe('ShadowLedgerVisualizer', () => {
   it('loads the built-in sample on Load sample click', () => {
     render(<ShadowLedgerVisualizer />)
     fireEvent.click(screen.getByText('Load sample'))
-    expect(screen.getByPlaceholderText(/shadow ledger entries json payload/i).value).toContain('OUT00275391')
+    expect(screen.getByPlaceholderText<HTMLTextAreaElement>(/shadow ledger entries json payload/i).value).toContain('OUT00275391')
   })
 
   it('clears input and result on Clear click', () => {
@@ -126,5 +126,30 @@ describe('ShadowLedgerVisualizer', () => {
     expect(screen.queryByText('Payment Method')).not.toBeInTheDocument()
     fireEvent.click(screen.getByLabelText(/show all columns/i))
     expect(screen.getByText('Payment Method')).toBeInTheDocument()
+  })
+
+  it('filters entries by operation', () => {
+    render(<ShadowLedgerVisualizer />)
+    visualize(UNBALANCED_ENTRIES)
+    fireEvent.change(screen.getByDisplayValue('All operations'), { target: { value: 'Refund' } })
+    expect(screen.getByText(/entries \(2 of 2\)/i)).toBeInTheDocument()
+  })
+
+  it('toggles sort direction when clicking the same column header twice', () => {
+    render(<ShadowLedgerVisualizer />)
+    visualize(BALANCED_ENTRIES)
+    const idHeader = screen.getByText('ID')
+    fireEvent.click(idHeader)
+    const ascFirstRow = screen.getAllByRole('row')[1].textContent
+    fireEvent.click(idHeader)
+    const descFirstRow = screen.getAllByRole('row')[1].textContent
+    expect(ascFirstRow).not.toBe(descFirstRow)
+  })
+
+  it('switches sort key when clicking a different column header', () => {
+    render(<ShadowLedgerVisualizer />)
+    visualize(BALANCED_ENTRIES)
+    fireEvent.click(screen.getByText('Policy Number'))
+    expect(screen.getByText('Policy Number').textContent).toContain('▲')
   })
 })

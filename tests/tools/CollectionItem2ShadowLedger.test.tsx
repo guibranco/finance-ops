@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
-import CollectionItem2ShadowLedger from '../../src/components/tools/CollectionItem2ShadowLedger.jsx'
+import CollectionItem2ShadowLedger from '../../src/components/tools/CollectionItem2ShadowLedger.tsx'
 
 // ── Fixtures ───────────────────────────────────────────────────────────────
 const BASE_ITEM = {
@@ -21,9 +21,9 @@ const BASE_ITEM = {
   id: 'Collection-3-1',
 }
 
-const makeItem = (overrides) => JSON.stringify({ ...BASE_ITEM, ...overrides })
+const makeItem = (overrides: Record<string, unknown>) => JSON.stringify({ ...BASE_ITEM, ...overrides })
 
-const convertItem = (item) => {
+const convertItem = (item: unknown) => {
   fireEvent.change(screen.getByPlaceholderText(/collection item document/i), {
     target: { value: typeof item === 'string' ? item : JSON.stringify(item) },
   })
@@ -31,7 +31,7 @@ const convertItem = (item) => {
 }
 
 const getOutputJson = () =>
-  JSON.parse(screen.getByPlaceholderText(/shadow ledger request will appear/i).value)
+  JSON.parse(screen.getByPlaceholderText<HTMLTextAreaElement>(/shadow ledger request will appear/i).value)
 
 describe('CollectionItem2ShadowLedger', () => {
   // ── Rendering ──────────────────────────────────────────────────────────
@@ -58,7 +58,7 @@ describe('CollectionItem2ShadowLedger', () => {
     render(<CollectionItem2ShadowLedger />)
     convertItem('{ bad json }')
     // The native JSON parse error is surfaced; verify an error alert is rendered
-    expect(document.querySelector('.alert-error')).not.toBeNull()
+    expect(document.querySelector('[data-testid="alert-error"]')).not.toBeNull()
     expect(screen.getByText('Error')).toBeInTheDocument() // badge
   })
 
@@ -163,7 +163,7 @@ describe('CollectionItem2ShadowLedger', () => {
   it('loads the built-in sample on Load sample click', () => {
     render(<CollectionItem2ShadowLedger />)
     fireEvent.click(screen.getByText('Load sample'))
-    expect(screen.getByPlaceholderText(/collection item document/i).value).toContain('OUTINT00172379')
+    expect(screen.getByPlaceholderText<HTMLTextAreaElement>(/collection item document/i).value).toContain('OUTINT00172379')
   })
 
   it('clears input and output on Clear click', () => {

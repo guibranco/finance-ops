@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { render, screen, fireEvent, within } from '@testing-library/react'
-import ShadowLedgerReconciliation from '../../src/components/tools/ShadowLedgerReconciliation.jsx'
+import ShadowLedgerReconciliation from '../../src/components/tools/ShadowLedgerReconciliation.tsx'
 
 // ── Fixtures ───────────────────────────────────────────────────────────────
 // "Clean" pair: DIM-A matches exactly on both sides, DIM-C only exists in the
@@ -19,6 +19,8 @@ const MATCH_JOURNAL_CSV = [
   'DIM-A,Ledger,,100,BATCH-1',
   'DIM-D,Ledger,40,,BATCH-1',
   'DIM-D,Ledger,,40,BATCH-1',
+  'BANK-ACC-1,Bank,50,,BATCH-1',
+  'BANK-ACC-1,Bank,,50,BATCH-1',
 ].join('\n')
 
 // DIM-A's credit total disagrees between the two files (90 vs 80); DIM-B
@@ -63,13 +65,13 @@ const UNTERMINATED_QUOTE_RAW_CSV = [
 ].join('\n')
 
 function getInputs() {
-  const inputs = document.querySelectorAll('input[type="file"]')
+  const inputs = document.querySelectorAll<HTMLInputElement>('input[type="file"]')
   return { rawInput: inputs[0], journalInput: inputs[1] }
 }
 
-async function uploadCsv(input, csvText, filename = 'file.csv') {
+async function uploadCsv(input: HTMLInputElement, csvText: string, filename = 'file.csv') {
   const file = new File([csvText], filename, { type: 'text/csv' })
-  const card = input.closest('.card')
+  const card = input.closest<HTMLElement>('[data-testid="card"]')!
   fireEvent.change(input, { target: { files: [file] } })
   // file.text() resolves asynchronously — wait (scoped to this card, since the
   // other card's stats text may already be on screen) for either the parsed
@@ -128,6 +130,17 @@ describe('ShadowLedgerReconciliation', () => {
     expect(screen.getByText('Premium')).toBeInTheDocument()
     expect(screen.getByText('PremiumNet')).toBeInTheDocument()
     expect(screen.getByText('Collection')).toBeInTheDocument()
+  })
+
+  it('shows journal bank lines separately from ledger dimensions', async () => {
+    render(<ShadowLedgerReconciliation />)
+    const { rawInput, journalInput } = getInputs()
+    await uploadCsv(rawInput, MATCH_RAW_CSV, 'raw.csv')
+    await uploadCsv(journalInput, MATCH_JOURNAL_CSV, 'journal.csv')
+    fireEvent.click(screen.getByText(/reconcile/i))
+
+    expect(screen.getByText('Journal Bank Lines')).toBeInTheDocument()
+    expect(screen.getByText('BANK-ACC-1')).toBeInTheDocument()
   })
 
   it('flags a dimension whose totals differ between the two files', async () => {

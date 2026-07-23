@@ -2,8 +2,48 @@ import { useState } from 'react'
 import { usePersistedField, USER_EMAIL_KEY } from '../../hooks/usePersistedField'
 import CopyButton from '../CopyButton'
 import RulesGrid from '../RulesGrid'
+import {
+  alert,
+  alertVariants,
+  btn,
+  btnGhost,
+  btnPrimary,
+  btnRow,
+  card,
+  cardTitle,
+  cardTitleDot,
+  cardTitleDotGreen,
+  codeArea,
+  codeAreaTall,
+  codeAreaWrap,
+  cx,
+  diffAdded,
+  diffChanged,
+  diffGrid,
+  diffPane,
+  diffRemoved,
+  formField,
+  formInput,
+  formLabel,
+  toolGrid2,
+} from '../../ui'
 
-const STATUSES = ['Refunded', 'Collected', 'Rejected']
+type Status = 'Refunded' | 'Collected' | 'Rejected'
+
+const STATUSES: Status[] = ['Refunded', 'Collected', 'Rejected']
+
+const statusButtonBase = 'flex-1 px-1 py-2 border-2 rounded-sm font-ui text-[0.78rem] font-bold cursor-pointer transition-all'
+const statusButtonInactive = 'border-border bg-bg text-text-muted'
+const statusButtonActiveVariants: Record<Status, string> = {
+  Refunded: 'border-info bg-info/10 text-info',
+  Collected: 'border-green bg-green/10 text-green',
+  Rejected: 'border-danger bg-danger/10 text-danger',
+}
+const newItemBadgeVariants: Record<Status, string> = {
+  Refunded: 'bg-info/12 text-info border border-info/30',
+  Collected: 'bg-green/12 text-green border border-green/30',
+  Rejected: 'bg-danger/12 text-danger border border-danger/30',
+}
 
 const SAMPLE_COLLECTION = JSON.stringify({
   BatchId: '00000000-0000-0000-0000-000000000000',
@@ -52,7 +92,7 @@ const SAMPLE_COLLECTION = JSON.stringify({
   _ts: 1723106587,
 }, null, 2)
 
-function removeCosmosFields(obj) {
+function removeCosmosFields(obj: Record<string, unknown>): Record<string, unknown> {
   const cleaned = { ...obj }
   delete cleaned._etag
   delete cleaned._rid
@@ -62,25 +102,27 @@ function removeCosmosFields(obj) {
   return cleaned
 }
 
-function renderDiffLines(left, right) {
+type DiffSegment = string | { text: string; cls: string }
+
+function renderDiffLines(left: unknown, right: unknown): { leftHtml: DiffSegment[]; rightHtml: DiffSegment[] } {
   const leftLines = JSON.stringify(left, null, 4).split('\n')
   const rightLines = JSON.stringify(right, null, 4).split('\n')
   const max = Math.max(leftLines.length, rightLines.length)
-  const leftHtml = []
-  const rightHtml = []
+  const leftHtml: DiffSegment[] = []
+  const rightHtml: DiffSegment[] = []
 
   for (let i = 0; i < max; i++) {
     const l = leftLines[i] ?? ''
     const r = rightLines[i] ?? ''
     if (!l && r) {
       leftHtml.push('')
-      rightHtml.push({ text: r, cls: 'diff-added' })
+      rightHtml.push({ text: r, cls: diffAdded })
     } else if (l && !r) {
-      leftHtml.push({ text: l, cls: 'diff-removed' })
+      leftHtml.push({ text: l, cls: diffRemoved })
       rightHtml.push('')
     } else if (l !== r) {
-      leftHtml.push({ text: l, cls: 'diff-changed' })
-      rightHtml.push({ text: r, cls: 'diff-changed' })
+      leftHtml.push({ text: l, cls: diffChanged })
+      rightHtml.push({ text: r, cls: diffChanged })
     } else {
       leftHtml.push(l)
       rightHtml.push(r)
@@ -89,9 +131,9 @@ function renderDiffLines(left, right) {
   return { leftHtml, rightHtml }
 }
 
-function DiffPane({ lines }) {
+function DiffPane({ lines }: { lines: DiffSegment[] }) {
   return (
-    <div className="diff-pane">
+    <div className={diffPane}>
       {lines.map((line, i) => {
         if (!line) return <span key={i}>{'\n'}</span>
         if (typeof line === 'string') return <span key={i}>{line + '\n'}</span>
@@ -102,13 +144,13 @@ function DiffPane({ lines }) {
 }
 
 // Try to parse a date string to datetime-local format (YYYY-MM-DDTHH:mm)
-function toDatetimeLocal(isoString) {
+function toDatetimeLocal(isoString?: string): string {
   if (!isoString) return ''
   try {
     const d = new Date(isoString)
     if (isNaN(d.getTime())) return ''
     // Format as YYYY-MM-DDTHH:mm in local time
-    const pad = n => String(n).padStart(2, '0')
+    const pad = (n: number) => String(n).padStart(2, '0')
     return (
       d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) +
       'T' + pad(d.getHours()) + ':' + pad(d.getMinutes())
@@ -121,22 +163,22 @@ function toDatetimeLocal(isoString) {
 export default function UpdateCollectionStatus() {
   const [email, setEmail] = usePersistedField(USER_EMAIL_KEY)
   const [inputJson, setInputJson] = useState('')
-  const [newStatus, setNewStatus] = useState('Rejected')
+  const [newStatus, setNewStatus] = useState<Status>('Rejected')
   const [processingDate, setProcessingDate] = useState('')
   const [errorCode, setErrorCode] = useState('')
   const [errorMessage, setErrorMessage] = useState('')
   const [historicDoc, setHistoricDoc] = useState('')
   const [newDoc, setNewDoc] = useState('')
-  const [diffLines, setDiffLines] = useState(null)
+  const [diffLines, setDiffLines] = useState<{ leftHtml: DiffSegment[]; rightHtml: DiffSegment[] } | null>(null)
   const [error, setError] = useState('')
 
   // When JSON input changes, try to prefill processingDate from ModifiedDate
-  function handleJsonChange(val) {
+  function handleJsonChange(val: string) {
     setInputJson(val)
     setError('')
     try {
-      const parsed = JSON.parse(val)
-      if (parsed.ModifiedDate) {
+      const parsed = JSON.parse(val) as Record<string, unknown>
+      if (typeof parsed.ModifiedDate === 'string') {
         setProcessingDate(toDatetimeLocal(parsed.ModifiedDate))
       }
     } catch {
@@ -171,20 +213,20 @@ export default function UpdateCollectionStatus() {
     }
 
     try {
-      const raw = JSON.parse(inputJson)
+      const raw = JSON.parse(inputJson) as Record<string, unknown>
       const input = removeCosmosFields(raw)
       const originalId = input.id
       const now = new Date().toISOString()
 
       // ── Historic item (the old IsLatest=true becomes the archive) ──────
-      const historic = JSON.parse(JSON.stringify(input))
+      const historic = JSON.parse(JSON.stringify(input)) as Record<string, unknown>
       historic.IsLatest = false
       historic.ModifiedBy = email
       historic.ModifiedDate = now
-      historic.id = `${originalId}-${input.CollectionStatus}`
+      historic.id = `${originalId as string}-${input.CollectionStatus as string}`
 
       // ── New item (becomes the new latest) ─────────────────────────────
-      const fresh = JSON.parse(JSON.stringify(input))
+      const fresh = JSON.parse(JSON.stringify(input)) as Record<string, unknown>
       fresh.IsLatest = true
       fresh.CollectionStatus = newStatus
       fresh.id = originalId
@@ -195,10 +237,11 @@ export default function UpdateCollectionStatus() {
 
       if (isDateStatus) {
         const pd = processingDate ? new Date(processingDate).toISOString() : now
+        const existingProviderDetails = (fresh.ProviderDetails as Record<string, unknown> | null | undefined) || {}
         fresh.ProviderDetails = {
-          ...(fresh.ProviderDetails || {}),
+          ...existingProviderDetails,
           ProcessingDate: pd,
-          Filename: fresh.ProviderDetails?.Filename ?? null,
+          Filename: existingProviderDetails.Filename ?? null,
           ErrorCode: null,
           ErrorMessage: null,
         }
@@ -216,7 +259,7 @@ export default function UpdateCollectionStatus() {
       setNewDoc(JSON.stringify(fresh, null, 4))
       setDiffLines(renderDiffLines(historic, fresh))
     } catch (e) {
-      setError('Invalid JSON: ' + e.message)
+      setError('Invalid JSON: ' + (e as Error).message)
     }
   }
 
@@ -238,62 +281,44 @@ export default function UpdateCollectionStatus() {
     setErrorMessage('')
   }
 
-  const statusColors = {
-    Refunded: 'var(--info)',
-    Collected: 'var(--green)',
-    Rejected: 'var(--danger)',
-  }
-
   return (
     <div>
       {/* Top row: config + JSON input */}
-      <div style={{ display: 'grid', gridTemplateColumns: '320px 1fr', gap: 20, marginBottom: 20, alignItems: 'start' }}>
+      <div className="grid grid-cols-[320px_1fr] gap-5 mb-5 items-start max-tool:grid-cols-1">
 
         {/* Config sidebar */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-          <div className="card">
-            <div className="card-title">
-              <span className="card-title-dot" />
+        <div className="flex flex-col gap-3.5">
+          <div className={card}>
+            <div className={cardTitle}>
+              <span className={cardTitleDot} />
               Your Email
             </div>
-            <div className="form-field" style={{ marginBottom: 0 }}>
+            <div className={formField} style={{ marginBottom: 0 }}>
               <input
                 type="email"
-                className="form-input"
+                className={formInput}
                 placeholder="you@company.ie"
                 value={email}
                 onChange={e => setEmail(e.target.value)}
               />
-              <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: 6 }}>
+              <p className="text-[0.72rem] text-text-muted mt-1.5">
                 Used as CreatedBy, ModifiedBy. Persisted.
               </p>
             </div>
           </div>
 
-          <div className="card">
-            <div className="card-title">
-              <span className="card-title-dot" />
+          <div className={card}>
+            <div className={cardTitle}>
+              <span className={cardTitleDot} />
               New Collection Status
             </div>
-            <div className="form-field" style={{ marginBottom: 14 }}>
-              <div style={{ display: 'flex', gap: 8 }}>
+            <div className={formField} style={{ marginBottom: 14 }}>
+              <div className="flex gap-2">
                 {STATUSES.map(s => (
                   <button
                     key={s}
                     onClick={() => setNewStatus(s)}
-                    style={{
-                      flex: 1,
-                      padding: '8px 4px',
-                      border: `2px solid ${newStatus === s ? statusColors[s] : 'var(--border)'}`,
-                      borderRadius: 'var(--radius-sm)',
-                      background: newStatus === s ? `color-mix(in srgb, ${statusColors[s]} 10%, transparent)` : 'var(--bg)',
-                      color: newStatus === s ? statusColors[s] : 'var(--text-muted)',
-                      fontFamily: 'var(--font-ui)',
-                      fontSize: '0.78rem',
-                      fontWeight: 700,
-                      cursor: 'pointer',
-                      transition: 'all var(--transition)',
-                    }}
+                    className={cx(statusButtonBase, newStatus === s ? statusButtonActiveVariants[s] : statusButtonInactive)}
                   >
                     {s}
                   </button>
@@ -303,15 +328,15 @@ export default function UpdateCollectionStatus() {
 
             {/* Conditional fields */}
             {isDateStatus && (
-              <div className="form-field" style={{ marginBottom: 0 }}>
-                <label className="form-label">ProviderDetails.ProcessingDate</label>
+              <div className={formField} style={{ marginBottom: 0 }}>
+                <label className={formLabel}>ProviderDetails.ProcessingDate</label>
                 <input
                   type="datetime-local"
-                  className="form-input"
+                  className={formInput}
                   value={processingDate}
                   onChange={e => setProcessingDate(e.target.value)}
                 />
-                <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: 6 }}>
+                <p className="text-[0.72rem] text-text-muted mt-1.5">
                   Pre-filled from ModifiedDate. Editable.
                 </p>
               </div>
@@ -319,19 +344,19 @@ export default function UpdateCollectionStatus() {
 
             {isRejected && (
               <>
-                <div className="form-field">
-                  <label className="form-label">ProviderDetails.ErrorCode</label>
+                <div className={formField}>
+                  <label className={formLabel}>ProviderDetails.ErrorCode</label>
                   <input
-                    className="form-input"
+                    className={formInput}
                     placeholder="e.g. NOT_FOUND"
                     value={errorCode}
                     onChange={e => setErrorCode(e.target.value)}
                   />
                 </div>
-                <div className="form-field" style={{ marginBottom: 0 }}>
-                  <label className="form-label">ProviderDetails.ErrorMessage</label>
+                <div className={formField} style={{ marginBottom: 0 }}>
+                  <label className={formLabel}>ProviderDetails.ErrorMessage</label>
                   <input
-                    className="form-input"
+                    className={formInput}
                     placeholder="e.g. Transaction not found in gateway"
                     value={errorMessage}
                     onChange={e => setErrorMessage(e.target.value)}
@@ -343,38 +368,38 @@ export default function UpdateCollectionStatus() {
         </div>
 
         {/* JSON input + generate */}
-        <div className="card">
-          <div className="card-title">
-            <span className="card-title-dot" />
-            Input Collection JSON <span style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 0, color: 'var(--text-faint)', fontSize: '0.75rem' }}>(IsLatest = true)</span>
+        <div className={card}>
+          <div className={cardTitle}>
+            <span className={cardTitleDot} />
+            Input Collection JSON <span className="font-normal normal-case tracking-normal text-text-faint text-[0.75rem]">(IsLatest = true)</span>
           </div>
-          <div className="code-area-wrap">
+          <div className={codeAreaWrap}>
             <textarea
-              className="code-area code-area-tall"
+              className={cx(codeArea, codeAreaTall)}
               value={inputJson}
               onChange={e => handleJsonChange(e.target.value)}
               placeholder="Paste the original collection document here..."
             />
           </div>
-          <div className="btn-row">
-            <button className="btn btn-primary" onClick={generate}>Generate Documents →</button>
-            <button className="btn btn-ghost" onClick={loadSample}>Load sample</button>
-            <button className="btn btn-ghost" onClick={handleClear}>Clear</button>
+          <div className={btnRow}>
+            <button className={cx(btn, btnPrimary)} onClick={generate}>Generate Documents →</button>
+            <button className={cx(btn, btnGhost)} onClick={loadSample}>Load sample</button>
+            <button className={cx(btn, btnGhost)} onClick={handleClear}>Clear</button>
           </div>
-          {error && <div className="alert alert-error">{error}</div>}
+          {error && <div data-testid="alert-error" className={cx(alert, alertVariants.error)}>{error}</div>}
         </div>
       </div>
 
       {/* Two outputs */}
-      <div className="tool-grid-2" style={{ marginBottom: 20 }}>
-        <div className="card">
-          <div className="card-title">
-            <span className="card-title-dot" />
-            Historic Item <span style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 0, color: 'var(--text-faint)', fontSize: '0.75rem' }}>IsLatest = false · id appended</span>
+      <div className={cx(toolGrid2, 'mb-5')}>
+        <div className={card}>
+          <div className={cardTitle}>
+            <span className={cardTitleDot} />
+            Historic Item <span className="font-normal normal-case tracking-normal text-text-faint text-[0.75rem]">IsLatest = false · id appended</span>
           </div>
-          <div className="code-area-wrap">
+          <div className={codeAreaWrap}>
             <textarea
-              className="code-area code-area-tall"
+              className={cx(codeArea, codeAreaTall)}
               value={historicDoc}
               readOnly
               placeholder="Updated original will appear here..."
@@ -383,31 +408,20 @@ export default function UpdateCollectionStatus() {
           </div>
         </div>
 
-        <div className="card">
-          <div className="card-title">
-            <span className="card-title-dot green" />
+        <div className={card}>
+          <div className={cardTitle}>
+            <span className={cardTitleDotGreen} />
             New Item
             {newStatus && (
-              <span style={{
-                marginLeft: 8,
-                padding: '2px 8px',
-                borderRadius: 20,
-                fontSize: '0.7rem',
-                fontWeight: 700,
-                background: `color-mix(in srgb, ${statusColors[newStatus]} 12%, transparent)`,
-                color: statusColors[newStatus],
-                border: `1px solid color-mix(in srgb, ${statusColors[newStatus]} 30%, transparent)`,
-                fontFamily: 'var(--font-mono)',
-                letterSpacing: '0.04em',
-              }}>
+              <span className={cx('ml-2 px-2 py-0.5 rounded-full text-[0.7rem] font-bold font-mono tracking-[0.04em]', newItemBadgeVariants[newStatus])}>
                 {newStatus}
               </span>
             )}
-            <span style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 0, color: 'var(--text-faint)', fontSize: '0.75rem', marginLeft: 6 }}>IsLatest = true</span>
+            <span className="font-normal normal-case tracking-normal text-text-faint text-[0.75rem] ml-1.5">IsLatest = true</span>
           </div>
-          <div className="code-area-wrap">
+          <div className={codeAreaWrap}>
             <textarea
-              className="code-area code-area-tall"
+              className={cx(codeArea, codeAreaTall)}
               value={newDoc}
               readOnly
               placeholder="New processed document will appear here..."
@@ -419,16 +433,16 @@ export default function UpdateCollectionStatus() {
 
       {/* Diff viewer */}
       {diffLines && (
-        <div className="card" style={{ marginBottom: 20 }}>
-          <div className="card-title" style={{ marginBottom: 14 }}>
-            <span className="card-title-dot" />
+        <div className={cx(card, 'mb-5')}>
+          <div className={cx(cardTitle, 'mb-3.5')}>
+            <span className={cardTitleDot} />
             Diff Viewer
-            <span style={{ marginLeft: 'auto', display: 'flex', gap: 12, fontSize: '0.72rem', fontWeight: 500 }}>
-              <span style={{ color: 'var(--danger)', fontFamily: 'var(--font-mono)' }}>■ removed/changed</span>
-              <span style={{ color: 'var(--green)', fontFamily: 'var(--font-mono)' }}>■ added/changed</span>
+            <span className="ml-auto flex gap-3 text-[0.72rem] font-medium">
+              <span className="text-danger font-mono">■ removed/changed</span>
+              <span className="text-green font-mono">■ added/changed</span>
             </span>
           </div>
-          <div className="diff-grid">
+          <div className={diffGrid}>
             <DiffPane lines={diffLines.leftHtml} />
             <DiffPane lines={diffLines.rightHtml} />
           </div>

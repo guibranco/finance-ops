@@ -1,17 +1,13 @@
-import { defineConfig } from 'vite';
-import react from '@vitejs/plugin-react';
+import { defineConfig, mergeConfig } from 'vitest/config';
+import viteConfig from './vite.config.ts';
 
-export default defineConfig({
-  plugins: [react()],
-  base: '/finance-ops/',
-  optimizeDeps: {
-    exclude: ['lucide-react'],
-  },
+export default mergeConfig(viteConfig, defineConfig({
   test: {
     environment: 'jsdom',
     globals: true,
-    setupFiles: ['./tests/setup.js'],
-    include: ['tests/**/*.test.{js,jsx}'],
+    setupFiles: ['./tests/setup.ts'],
+    include: ['tests/**/*.test.{ts,tsx}'],
+    css: false,
     // Running test files in worker threads crashes intermittently on Windows in this
     // environment; run them sequentially in a single process for reliability.
     fileParallelism: false,
@@ -19,8 +15,8 @@ export default defineConfig({
       provider: 'v8',
       reporter: ['text', 'lcov', 'html'],
       reportsDirectory: './coverage',
-      include: ['src/**/*.{js,jsx}'],
-      exclude: ['src/main.jsx'],
+      include: ['src/**/*.{ts,tsx}'],
+      exclude: ['src/main.tsx', 'src/vite-env.d.ts', '**/*.d.ts'],
       thresholds: {
         lines: 80,
         functions: 80,
@@ -29,4 +25,4 @@ export default defineConfig({
       },
     },
   },
-});
+}));

@@ -1,0 +1,90 @@
+@import "tailwindcss";
+
+/* Design tokens — mapped onto Tailwind v4's theme namespaces so utilities
+   like bg-purple, rounded-lg, shadow-purple and font-ui/font-mono resolve to
+   this app's brand values instead of Tailwind's defaults. */
+@theme {
+  --font-ui: 'Syne', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+
+  --color-purple: #79378b;
+  --color-purple-dark: #5e2b6c;
+  --color-purple-light: #9b4aae;
+  --color-purple-dim: rgba(121, 55, 139, 0.07);
+  --color-purple-border: rgba(121, 55, 139, 0.3);
+  --color-green: #76a432;
+  --color-green-bright: #93cd3f;
+  --color-green-dim: rgba(118, 164, 50, 0.1);
+  --color-green-border: rgba(118, 164, 50, 0.35);
+
+  --color-bg: #f8f5fa;
+  --color-surface: #ffffff;
+  --color-border: rgba(121, 55, 139, 0.15);
+  --color-border-subtle: rgba(121, 55, 139, 0.1);
+
+  --color-text: #1e1028;
+  --color-text-muted: #6b5880;
+  --color-text-faint: #b09ec0;
+
+  --color-code-bg: #f3eff7;
+  --color-code-text: #3d1f4d;
+  --color-code-border: rgba(121, 55, 139, 0.15);
+
+  --color-danger: #c0392b;
+  --color-danger-dim: rgba(192, 57, 43, 0.07);
+  --color-info: #2563eb;
+  --color-warning: #b7791f;
+  --color-warning-dim: rgba(183, 121, 31, 0.09);
+  --color-warning-border: rgba(183, 121, 31, 0.3);
+
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 18px;
+  --radius-xl: 24px;
+
+  --shadow-xs: 0 1px 4px rgba(121, 55, 139, 0.08);
+  --shadow-md: 0 2px 12px rgba(121, 55, 139, 0.1);
+  --shadow-lg: 0 4px 24px rgba(121, 55, 139, 0.12);
+  --shadow-purple: 0 4px 16px rgba(121, 55, 139, 0.2);
+  --shadow-purple-lg: 0 6px 20px rgba(121, 55, 139, 0.3);
+  --shadow-green: 0 4px 14px rgba(118, 164, 50, 0.25);
+
+  /* Matches the app's single responsive breakpoint (collapse to one column,
+     hide tab labels) below 900px — not one of Tailwind's default steps. */
+  --breakpoint-tool: 900px;
+
+  --animate-pulse-dot: pulse-dot 2s ease-in-out infinite;
+
+  @keyframes pulse-dot {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.5; transform: scale(0.8); }
+  }
+}
+
+@layer base {
+  html {
+    font-size: 16px;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  body {
+    font-family: var(--font-ui);
+    background-color: var(--color-bg);
+    color: var(--color-text);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: rgba(121, 55, 139, 0.2); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: rgba(121, 55, 139, 0.35); }
+}
+
+@utility select-arrow {
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%236b5880'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  padding-right: 32px;
+}

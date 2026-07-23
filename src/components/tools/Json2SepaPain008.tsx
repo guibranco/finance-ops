@@ -1,7 +1,51 @@
 import { useState, useEffect, useRef } from 'react'
+import { Check, Download, Save, Trash2 } from 'lucide-react'
 import CopyButton from '../CopyButton'
+import {
+  alert,
+  alertVariants,
+  btn,
+  btnDanger,
+  btnGhost,
+  btnPrimary,
+  btnRow,
+  btnSecondary,
+  card,
+  cardTitle,
+  cardTitleDot,
+  cardTitleDotGreen,
+  codeArea,
+  codeAreaTall,
+  codeAreaWrap,
+  codeAreaXl,
+  cx,
+  formField,
+  formInput,
+  formLabel,
+  formSelect,
+  toolGrid2,
+} from '../../ui'
 
 const STORAGE_KEY = 'sepaConverterFields'
+
+interface DirectDebitInput {
+  AmountDue: number
+  Iban: string
+  AccountHolderName: string
+  MandateId: string
+  MandateSignedDate: string
+  TransactionReference?: string
+  id?: string
+  IsFirstDirectDebit?: boolean
+}
+
+interface SavedFields {
+  oin?: string
+  creditorName?: string
+  creditorIban?: string
+  collectionDate?: string
+  transactionType?: string
+}
 
 const SAMPLE_JSON = JSON.stringify({
   BatchId: '94a6b2dc-9999-427b-9999-539999c9666f',
@@ -17,65 +61,60 @@ const SAMPLE_JSON = JSON.stringify({
   id: 'OUT00123456-1-2-HME-8',
 }, null, 2)
 
-function formatDate(s) {
+function formatDate(s?: string): string {
   if (!s) return ''
   try { return new Date(s).toISOString().split('T')[0] } catch { return s }
 }
 
-function formatDateTime(d = null) {
+function formatDateTime(d: Date | null = null): string {
   return (d || new Date()).toISOString().replace(/\.\d{3}Z$/, '')
 }
 
-function generateMessageId(type = 'NORMAL') {
+function generateMessageId(type = 'NORMAL'): string {
   const now = new Date()
   const dateStr = now.toISOString().split('T')[0].replace(/-/g, '')
   const timeStr = now.toTimeString().split(' ')[0].replace(/:/g, '')
   return `${dateStr}-${timeStr}-${type}-PAIN008`
 }
 
-function getDefaultCollectionDate() {
+function getDefaultCollectionDate(): string {
   const d = new Date(); d.setDate(d.getDate() + 2)
   return d.toISOString().split('T')[0]
 }
 
-function cleanIban(iban) {
+function cleanIban(iban?: string): string {
   return iban ? iban.trim().replace(/\s+/g, '') : ''
+}
+
+function readSavedFields(): SavedFields | null {
+  const raw = localStorage.getItem(STORAGE_KEY)
+  if (!raw) return null
+  try { return JSON.parse(raw) as SavedFields } catch { return null }
 }
 
 export default function Json2SepaPain008() {
   const [jsonInput, setJsonInput] = useState(SAMPLE_JSON)
-  const [oin, setOin] = useState('IE99ZZZ999999')
-  const [creditorName, setCreditorName] = useState('Company Name DAC')
-  const [creditorIban, setCreditorIban] = useState('IE29AIBK93115212345678')
-  const [collectionDate, setCollectionDate] = useState(getDefaultCollectionDate())
-  const [transactionType, setTransactionType] = useState('NORMAL')
+  const [oin, setOin] = useState(() => readSavedFields()?.oin || 'IE99ZZZ999999')
+  const [creditorName, setCreditorName] = useState(() => readSavedFields()?.creditorName || 'Company Name DAC')
+  const [creditorIban, setCreditorIban] = useState(() => readSavedFields()?.creditorIban || 'IE29AIBK93115212345678')
+  const [collectionDate, setCollectionDate] = useState(() => readSavedFields()?.collectionDate || getDefaultCollectionDate())
+  const [transactionType, setTransactionType] = useState(() => readSavedFields()?.transactionType || 'NORMAL')
   const [xmlOutput, setXmlOutput] = useState('')
   const [error, setError] = useState('')
-  const [savedMsg, setSavedMsg] = useState('')
+  const [savedMsg, setSavedMsg] = useState(() => (readSavedFields() ? 'info:Previously saved fields have been restored.' : ''))
   const [downloaded, setDownloaded] = useState(false)
   const msgIdRef = useRef('')
 
-  // Load saved fields on mount
+  // Auto-clear whichever saved-fields notice (restored/saved/cleared) is showing.
   useEffect(() => {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    if (raw) {
-      try {
-        const f = JSON.parse(raw)
-        if (f.oin)             setOin(f.oin)
-        if (f.creditorName)    setCreditorName(f.creditorName)
-        if (f.creditorIban)    setCreditorIban(f.creditorIban)
-        if (f.collectionDate)  setCollectionDate(f.collectionDate)
-        if (f.transactionType) setTransactionType(f.transactionType)
-        setSavedMsg('info:Previously saved fields have been restored.')
-        setTimeout(() => setSavedMsg(''), 3000)
-      } catch {}
-    }
-  }, [])
+    if (!savedMsg) return
+    const id = setTimeout(() => setSavedMsg(''), 3000)
+    return () => clearTimeout(id)
+  }, [savedMsg])
 
   function saveFields() {
     localStorage.setItem(STORAGE_KEY, JSON.stringify({ oin, creditorName, creditorIban, collectionDate, transactionType }))
     setSavedMsg('success:Fields saved successfully.')
-    setTimeout(() => setSavedMsg(''), 3000)
   }
 
   function clearSavedFields() {
@@ -83,7 +122,6 @@ export default function Json2SepaPain008() {
     setOin(''); setCreditorName(''); setCreditorIban('')
     setCollectionDate(getDefaultCollectionDate()); setTransactionType('NORMAL')
     setSavedMsg('info:Saved fields cleared and form reset.')
-    setTimeout(() => setSavedMsg(''), 3000)
   }
 
   function convertToXML() {
@@ -94,8 +132,8 @@ export default function Json2SepaPain008() {
     if (!creditorIban.trim()) return setError('Please enter a creditor IBAN.')
 
     try {
-      const data = JSON.parse(jsonInput)
-      const required = ['AmountDue', 'Iban', 'AccountHolderName', 'MandateId', 'MandateSignedDate']
+      const data = JSON.parse(jsonInput) as DirectDebitInput
+      const required: (keyof DirectDebitInput)[] = ['AmountDue', 'Iban', 'AccountHolderName', 'MandateId', 'MandateSignedDate']
       const missing = required.filter(f => !data[f])
       if (missing.length) throw new Error(`Missing required fields: ${missing.join(', ')}`)
 
@@ -203,7 +241,7 @@ export default function Json2SepaPain008() {
 
       setXmlOutput(xml)
     } catch (e) {
-      setError(e.message)
+      setError((e as Error).message)
     }
   }
 
@@ -221,93 +259,97 @@ export default function Json2SepaPain008() {
   const [savedType, savedText] = savedMsg ? savedMsg.split(':') : ['', '']
 
   return (
-    <div className="tool-grid-2">
+    <div className={toolGrid2}>
       {/* Left: Config + Input */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <div className="flex flex-col gap-4">
         {/* Config */}
-        <div className="card">
-          <div className="card-title">
-            <span className="card-title-dot" />
+        <div className={card}>
+          <div className={cardTitle}>
+            <span className={cardTitleDot} />
             Configuration
           </div>
-          <div className="form-field">
-            <label className="form-label">OIN</label>
-            <input className="form-input" value={oin} onChange={e => setOin(e.target.value)} placeholder="IE99ZZZ999999" />
+          <div className={formField}>
+            <label className={formLabel}>OIN</label>
+            <input className={formInput} value={oin} onChange={e => setOin(e.target.value)} placeholder="IE99ZZZ999999" />
           </div>
-          <div className="form-field">
-            <label className="form-label">Creditor Account Name</label>
-            <input className="form-input" value={creditorName} onChange={e => setCreditorName(e.target.value)} placeholder="Company Name DAC" />
+          <div className={formField}>
+            <label className={formLabel}>Creditor Account Name</label>
+            <input className={formInput} value={creditorName} onChange={e => setCreditorName(e.target.value)} placeholder="Company Name DAC" />
           </div>
-          <div className="form-field">
-            <label className="form-label">Creditor IBAN</label>
-            <input className="form-input" value={creditorIban} onChange={e => setCreditorIban(e.target.value)} placeholder="IE29AIBK..." />
+          <div className={formField}>
+            <label className={formLabel}>Creditor IBAN</label>
+            <input className={formInput} value={creditorIban} onChange={e => setCreditorIban(e.target.value)} placeholder="IE29AIBK..." />
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-            <div className="form-field">
-              <label className="form-label">Collection Date</label>
-              <input type="date" className="form-input" value={collectionDate} onChange={e => setCollectionDate(e.target.value)} />
+          <div className="grid grid-cols-2 gap-3">
+            <div className={formField}>
+              <label className={formLabel}>Collection Date</label>
+              <input type="date" className={formInput} value={collectionDate} onChange={e => setCollectionDate(e.target.value)} />
             </div>
-            <div className="form-field">
-              <label className="form-label">Transaction Type</label>
-              <select className="form-input" value={transactionType} onChange={e => setTransactionType(e.target.value)}>
+            <div className={formField}>
+              <label className={formLabel}>Transaction Type</label>
+              <select className={formSelect} value={transactionType} onChange={e => setTransactionType(e.target.value)}>
                 <option value="NORMAL">NORMAL</option>
                 <option value="RNEWAL">RENEWAL</option>
                 <option value="RESUBM">RESUBMISSION</option>
               </select>
             </div>
           </div>
-          <div className="btn-row">
-            <button className="btn btn-ghost" onClick={saveFields}>💾 Save fields</button>
-            <button className="btn btn-ghost btn-danger" onClick={clearSavedFields}>🗑 Clear saved</button>
+          <div className={btnRow}>
+            <button className={cx(btn, btnGhost)} onClick={saveFields}>
+              <Save size={14} /> Save fields
+            </button>
+            <button className={cx(btn, btnDanger)} onClick={clearSavedFields}>
+              <Trash2 size={14} /> Clear saved
+            </button>
           </div>
           {savedText && (
-            <div className={`alert ${savedType === 'success' ? 'alert-success' : 'alert-info'}`}>
+            <div className={cx(alert, savedType === 'success' ? alertVariants.success : alertVariants.info)}>
               {savedText}
             </div>
           )}
         </div>
 
         {/* JSON Input */}
-        <div className="card">
-          <div className="card-title">
-            <span className="card-title-dot" />
+        <div className={card}>
+          <div className={cardTitle}>
+            <span className={cardTitleDot} />
             Direct Debit JSON
           </div>
-          <div className="code-area-wrap">
+          <div className={codeAreaWrap}>
             <textarea
-              className="code-area code-area-tall"
+              className={cx(codeArea, codeAreaTall)}
               value={jsonInput}
               onChange={e => setJsonInput(e.target.value)}
               placeholder="Paste the Direct Debit JSON here..."
             />
           </div>
-          <div className="btn-row">
-            <button className="btn btn-primary" onClick={convertToXML}>Convert to XML →</button>
+          <div className={btnRow}>
+            <button className={cx(btn, btnPrimary)} onClick={convertToXML}>Convert to XML →</button>
           </div>
-          {error && <div className="alert alert-error">{error}</div>}
+          {error && <div data-testid="alert-error" className={cx(alert, alertVariants.error)}>{error}</div>}
         </div>
       </div>
 
       {/* Right: XML Output */}
-      <div className="card">
-        <div className="card-title">
-          <span className="card-title-dot green" />
+      <div className={card}>
+        <div className={cardTitle}>
+          <span className={cardTitleDotGreen} />
           SEPA pain.008.001.08 XML Output
         </div>
-        <div className="code-area-wrap" style={{ flex: 1 }}>
+        <div className={cx(codeAreaWrap, 'flex-1')}>
           <textarea
-            className="code-area code-area-xl"
+            className={cx(codeArea, codeAreaXl, 'font-mono text-[#a8d8ff]')}
             value={xmlOutput}
             readOnly
             placeholder="XML output will appear here..."
-            style={{ fontFamily: 'var(--font-mono)', color: '#a8d8ff' }}
           />
           <CopyButton text={xmlOutput} timeoutMs={2000} />
         </div>
         {xmlOutput && (
-          <div className="btn-row" style={{ marginTop: 14 }}>
-            <button className="btn btn-secondary" onClick={handleDownload}>
-              {downloaded ? '✓ Downloaded' : '⬇ Download XML'}
+          <div className={cx(btnRow, 'mt-3.5')}>
+            <button className={cx(btn, btnSecondary)} onClick={handleDownload}>
+              {downloaded ? <Check size={14} /> : <Download size={14} />}
+              {downloaded ? 'Downloaded' : 'Download XML'}
             </button>
           </div>
         )}

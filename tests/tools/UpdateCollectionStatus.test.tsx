@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
-import UpdateCollectionStatus from '../../src/components/tools/UpdateCollectionStatus.jsx'
+import UpdateCollectionStatus from '../../src/components/tools/UpdateCollectionStatus.tsx'
 
 const VALID_COLLECTION = JSON.stringify({
   BatchId: '00000000-0000-0000-0000-000000000000',
@@ -26,7 +26,7 @@ const VALID_COLLECTION = JSON.stringify({
   _ts: 1700000000,
 })
 
-const selectStatus = (status) => fireEvent.click(screen.getByRole("button", { name: status }))
+const selectStatus = (status: string) => fireEvent.click(screen.getByRole("button", { name: status }))
 
 const pasteAndGenerate = (email = 'ops@test.ie', jsonValue = VALID_COLLECTION) => {
   fireEvent.change(screen.getByPlaceholderText('you@company.ie'), { target: { value: email } })
@@ -40,10 +40,10 @@ const fillRejected = (code = 'ERR', msg = 'Something failed') => {
 }
 
 const getHistoric = () =>
-  JSON.parse(screen.getByPlaceholderText(/updated original will appear/i).value)
+  JSON.parse(screen.getByPlaceholderText<HTMLTextAreaElement>(/updated original will appear/i).value)
 
 const getNewDoc = () =>
-  JSON.parse(screen.getByPlaceholderText(/new processed document will appear/i).value)
+  JSON.parse(screen.getByPlaceholderText<HTMLTextAreaElement>(/new processed document will appear/i).value)
 
 describe('Created2Rejected (Process Collection)', () => {
 
@@ -69,14 +69,14 @@ describe('Created2Rejected (Process Collection)', () => {
   it('shows ProcessingDate datetime input when Refunded is selected', () => {
     render(<UpdateCollectionStatus />)
     selectStatus('Refunded')
-    expect(document.querySelector('input[type="datetime-local"]')).not.toBeNull()
+    expect(document.querySelector<HTMLInputElement>('input[type="datetime-local"]')!).not.toBeNull()
     expect(screen.queryByPlaceholderText(/NOT_FOUND/i)).not.toBeInTheDocument()
   })
 
   it('shows ProcessingDate datetime input when Collected is selected', () => {
     render(<UpdateCollectionStatus />)
     selectStatus('Collected')
-    expect(document.querySelector('input[type="datetime-local"]')).not.toBeNull()
+    expect(document.querySelector<HTMLInputElement>('input[type="datetime-local"]')!).not.toBeNull()
     expect(screen.queryByPlaceholderText(/NOT_FOUND/i)).not.toBeInTheDocument()
   })
 
@@ -93,7 +93,7 @@ describe('Created2Rejected (Process Collection)', () => {
     fireEvent.change(screen.getByPlaceholderText(/original collection document/i), {
       target: { value: VALID_COLLECTION },
     })
-    const dtInput = document.querySelector('input[type="datetime-local"]')
+    const dtInput = document.querySelector<HTMLInputElement>('input[type="datetime-local"]')!
     expect(dtInput.value).toMatch(/^2024-06-15/)
   })
 
@@ -138,7 +138,7 @@ describe('Created2Rejected (Process Collection)', () => {
     render(<UpdateCollectionStatus />)
     selectStatus('Refunded')
     fireEvent.change(screen.getByPlaceholderText(/original collection document/i), { target: { value: VALID_COLLECTION } })
-    fireEvent.change(document.querySelector('input[type="datetime-local"]'), { target: { value: '' } })
+    fireEvent.change(document.querySelector<HTMLInputElement>('input[type="datetime-local"]')!, { target: { value: '' } })
     fireEvent.change(screen.getByPlaceholderText('you@company.ie'), { target: { value: 'ops@test.ie' } })
     fireEvent.click(screen.getByText('Generate Documents →'))
     expect(screen.getByText(/processing date/i)).toBeInTheDocument()
@@ -337,7 +337,7 @@ describe('Created2Rejected (Process Collection)', () => {
   it('loads the built-in sample on Load sample click', () => {
     render(<UpdateCollectionStatus />)
     fireEvent.click(screen.getByText('Load sample'))
-    expect(screen.getByPlaceholderText(/original collection document/i).value).toContain('OUTINT00172379')
+    expect(screen.getByPlaceholderText<HTMLTextAreaElement>(/original collection document/i).value).toContain('OUTINT00172379')
   })
 
   it('prefills ProcessingDate from the sample and clears any prior outputs', () => {
@@ -352,7 +352,7 @@ describe('Created2Rejected (Process Collection)', () => {
     expect(screen.getByPlaceholderText(/new processed document will appear/i)).toHaveValue('')
 
     selectStatus('Collected')
-    const dtInput = document.querySelector('input[type="datetime-local"]')
+    const dtInput = document.querySelector<HTMLInputElement>('input[type="datetime-local"]')!
     expect(dtInput.value).toMatch(/^2024-08-08/)
   })
 })

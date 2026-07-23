@@ -1,20 +1,20 @@
 import '@testing-library/jest-dom'
-import { vi } from 'vitest'
+import { vi, beforeEach } from 'vitest'
 
 // ── localStorage (full in-memory mock) ────────────────────────────────────
 const localStorageMock = (() => {
-  let store = {}
+  let store: Record<string, string> = {}
   return {
-    getItem:     (key)        => (key in store ? store[key] : null),
-    setItem:     (key, value) => { store[key] = String(value) },
-    removeItem:  (key)        => { delete store[key] },
-    clear:       ()           => { store = {} },
+    getItem:     (key: string)                 => (key in store ? store[key] : null),
+    setItem:     (key: string, value: unknown) => { store[key] = String(value) },
+    removeItem:  (key: string)                 => { delete store[key] },
+    clear:       ()                            => { store = {} },
     get length() { return Object.keys(store).length },
-    key:         (i)          => Object.keys(store)[i] ?? null,
+    key:         (i: number)                   => Object.keys(store)[i] ?? null,
   }
 })()
 
-Object.defineProperty(global, 'localStorage', {
+Object.defineProperty(globalThis, 'localStorage', {
   value: localStorageMock,
   writable: true,
   configurable: true,
@@ -31,12 +31,12 @@ Object.defineProperty(navigator, 'clipboard', {
 let uuidCounter = 0
 vi.stubGlobal('crypto', {
   randomUUID: vi.fn(() => `00000000-0000-0000-0000-${String(++uuidCounter).padStart(12, '0')}`),
-  getRandomValues: (arr) => arr,
+  getRandomValues: <T>(arr: T) => arr,
 })
 
 // ── URL helpers (download tests) ───────────────────────────────────────────
-global.URL.createObjectURL = vi.fn(() => 'blob:mock-url')
-global.URL.revokeObjectURL = vi.fn()
+globalThis.URL.createObjectURL = vi.fn(() => 'blob:mock-url')
+globalThis.URL.revokeObjectURL = vi.fn()
 
 // ── DOM anchor click (download) ────────────────────────────────────────────
 HTMLAnchorElement.prototype.click = vi.fn()

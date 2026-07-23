@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
-import Json2SepaPain008 from '../../src/components/tools/Json2SepaPain008.jsx'
+import Json2SepaPain008 from '../../src/components/tools/Json2SepaPain008.tsx'
 
 // ── Fixtures ───────────────────────────────────────────────────────────────
 const BASE_DD = {
@@ -13,9 +13,6 @@ const BASE_DD = {
   TransactionReference: 'OUT00123456-1-2-HME-8',
   id: 'OUT00123456-1-2-HME-8',
 }
-
-const setField = (placeholder, value) =>
-  fireEvent.change(screen.getByPlaceholderText(placeholder), { target: { value } })
 
 const fillForm = ({
   json = JSON.stringify(BASE_DD),
@@ -30,7 +27,7 @@ const fillForm = ({
   fireEvent.click(screen.getByText('Convert to XML →'))
 }
 
-const getXml = () => screen.getByPlaceholderText(/xml output will appear/i).value
+const getXml = () => screen.getByPlaceholderText<HTMLTextAreaElement>(/xml output will appear/i).value
 
 describe('Json2SepaPain008', () => {
   // ── Rendering ──────────────────────────────────────────────────────────
@@ -93,18 +90,18 @@ describe('Json2SepaPain008', () => {
     render(<Json2SepaPain008 />)
     fillForm({ json: '{ not json }' })
     // The native JSON parse error is shown in the alert; just verify the alert exists
-    expect(document.querySelector('.alert-error')).not.toBeNull()
+    expect(document.querySelector('[data-testid="alert-error"]')).not.toBeNull()
   })
 
   it.each(['AmountDue', 'AccountHolderName', 'MandateId', 'MandateSignedDate'])(
     'shows error when required field "%s" is missing from JSON',
-    (field) => {
+    (field: string) => {
       render(<Json2SepaPain008 />)
-      const { [field]: _omit, ...partial } = BASE_DD
+      const { [field]: _omit, ...partial } = BASE_DD as Record<string, unknown>
       fillForm({ json: JSON.stringify(partial) })
-      const alertEl = document.querySelector('.alert-error')
+      const alertEl = document.querySelector('[data-testid="alert-error"]')
       expect(alertEl).not.toBeNull()
-      expect(alertEl.textContent).toMatch(new RegExp(field, 'i'))
+      expect(alertEl!.textContent).toMatch(new RegExp(field, 'i'))
     }
   )
 
@@ -112,9 +109,9 @@ describe('Json2SepaPain008', () => {
     render(<Json2SepaPain008 />)
     const { Iban: _omit, ...partial } = BASE_DD
     fillForm({ json: JSON.stringify(partial) })
-    const alertEl = document.querySelector('.alert-error')
+    const alertEl = document.querySelector('[data-testid="alert-error"]')
     expect(alertEl).not.toBeNull()
-    expect(alertEl.textContent).toContain('Iban')
+    expect(alertEl!.textContent).toContain('Iban')
   })
 
   // ── Successful XML generation ──────────────────────────────────────────
@@ -214,7 +211,7 @@ describe('Json2SepaPain008', () => {
       target: { value: 'IE11ZZZ111111' },
     })
     fireEvent.click(screen.getByText(/save fields/i))
-    const stored = JSON.parse(localStorage.getItem('sepaConverterFields'))
+    const stored = JSON.parse(localStorage.getItem('sepaConverterFields')!)
     expect(stored.oin).toBe('IE11ZZZ111111')
   })
 

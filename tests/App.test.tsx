@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { render, screen, fireEvent, within } from '@testing-library/react'
-import App from '../src/App.jsx'
+import App from '../src/App.tsx'
 
 // Helper: get the nav element so tab assertions don't collide with the h2 heading
 const getNav = () => screen.getByRole('navigation')
@@ -59,22 +59,22 @@ describe('App', () => {
     expect(screen.getByText(/collection items export/i)).toBeInTheDocument()
   })
 
-  it('marks the active tab with the active class', () => {
+  it('marks the active tab with aria-current', () => {
     render(<App />)
-    const shadowTab = within(getNav()).getByText('Collection → Shadow Ledger').closest('button')
+    const shadowTab = within(getNav()).getByText('Collection → Shadow Ledger').closest('button')!
     fireEvent.click(shadowTab)
-    expect(shadowTab).toHaveClass('active')
+    expect(shadowTab).toHaveAttribute('aria-current', 'page')
   })
 
-  it('removes active class from the previous tab when switching', () => {
+  it('removes aria-current from the previous tab when switching', () => {
     render(<App />)
     const nav = getNav()
-    const resubTab = within(nav).getByText('Resubmission').closest('button')
-    const shadowTab = within(nav).getByText('Collection → Shadow Ledger').closest('button')
-    expect(resubTab).toHaveClass('active')
+    const resubTab = within(nav).getByText('Resubmission').closest('button')!
+    const shadowTab = within(nav).getByText('Collection → Shadow Ledger').closest('button')!
+    expect(resubTab).toHaveAttribute('aria-current', 'page')
     fireEvent.click(shadowTab)
-    expect(resubTab).not.toHaveClass('active')
-    expect(shadowTab).toHaveClass('active')
+    expect(resubTab).not.toHaveAttribute('aria-current')
+    expect(shadowTab).toHaveAttribute('aria-current', 'page')
   })
 
   it('displays the tool description subtitle on switch', () => {
@@ -94,8 +94,8 @@ describe('App', () => {
     localStorage.setItem('ft_active_tab', 'shadow-ledger')
     render(<App />)
     expect(screen.getByPlaceholderText(/collection item document/i)).toBeInTheDocument()
-    const shadowTab = within(getNav()).getByText('Collection → Shadow Ledger').closest('button')
-    expect(shadowTab).toHaveClass('active')
+    const shadowTab = within(getNav()).getByText('Collection → Shadow Ledger').closest('button')!
+    expect(shadowTab).toHaveAttribute('aria-current', 'page')
   })
 
   it('falls back to the default tab when localStorage has an unknown tab id', () => {

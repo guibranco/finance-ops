@@ -19,9 +19,11 @@ Each tool lives in its own tab, works entirely in the browser, and expects no ba
 ## 🧱 Tech Stack
 
 - [Vite](https://vitejs.dev/) – Frontend build tool
-- [React 19](https://reactjs.org/) – UI library
+- [React 19](https://reactjs.org/) + TypeScript – UI library
+- [Tailwind CSS v4](https://tailwindcss.com/) – Utility-first CSS
+- [lucide-react](https://lucide.dev/) – Icons
 - [Vitest](https://vitest.dev/) + [Testing Library](https://testing-library.com/) – Unit/component tests
-- Hand-rolled CSS design system (`src/App.css`) – no CSS framework at runtime
+- ESLint + typescript-eslint – Linting
 
 ---
 
@@ -52,9 +54,10 @@ Open the printed local URL (default [http://localhost:5173](http://localhost:517
 ## 🧪 Testing
 
 ```bash
-npm run test         # watch mode
-npm run test:run     # run the test suite once (CI)
-npm run test:coverage # run tests with coverage
+npm run test        # run the test suite once
+npm run test:watch  # watch mode
+npm run coverage    # run tests with coverage
+npm run lint        # lint the codebase
 ```
 
 ---
@@ -77,14 +80,15 @@ finance-ops/
 ├── src/
 │   ├── components/
 │   │   └── tools/       # CollectionItem2ResubmissionItem, CollectionItem2ShadowLedger,
-│   │                     # UpdateCollectionStatus, Json2SepaPain008, PaymentSchedule2Refund
-│   ├── App.jsx           # Tab navigation + tool registry
-│   ├── App.css           # Design system / styling
-│   └── main.jsx
+│   │                     # UpdateCollectionStatus, Json2SepaPain008, PaymentSchedule2Refund, ...
+│   ├── ui.ts              # Shared Tailwind utility-class constants
+│   ├── App.tsx            # Tab navigation + tool registry
+│   ├── index.css          # Tailwind v4 theme (design tokens)
+│   └── main.tsx
 ├── tests/
 │   └── tools/            # One test suite per tool
 ├── index.html
-└── vite.config.js
+└── vite.config.ts
 ```
 
 ---

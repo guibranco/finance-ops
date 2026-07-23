@@ -1,8 +1,68 @@
 import { useState } from 'react'
 import { usePersistedField, USER_EMAIL_KEY } from '../../hooks/usePersistedField'
 import CopyButton from '../CopyButton'
+import {
+  alert,
+  alertVariants,
+  btn,
+  btnGhost,
+  btnPrimary,
+  btnRow,
+  card,
+  cardTitle,
+  cardTitleDot,
+  cardTitleDotGreen,
+  codeArea,
+  codeAreaTall,
+  codeAreaWrap,
+  cx,
+  divider,
+  formField,
+  formInput,
+  formLabel,
+  formSelect,
+  itemAmount,
+  itemId,
+  itemInfo,
+  scheduleItemCheck,
+  scheduleItemCheckbox,
+  scheduleItemsList,
+  toolGrid2,
+} from '../../ui'
 
-const SAMPLE_SCHEDULE = {
+type ProrataBasis = 'percent' | 'amount'
+type ProrataAmountType = 'net' | 'gross'
+type RefundType = 'full' | 'prorated'
+
+interface ScheduleItem {
+  Id: string
+  CollectionType: string
+  PeriodStartDate: string
+  PeriodEndDate: string
+  AdjustmentDate: string
+  DueDate: string
+  AmountDue: number
+  NetAmount: number
+  TaxesAndLevies: Record<string, number>
+  AdminFees: Record<string, unknown>
+  OriginalItem: unknown
+  CollectionItemCreatedDate: string | null
+}
+
+interface PaymentSchedule {
+  PolicyNumber: string
+  RiskId: number
+  RiskCode: string
+  RiskMajorVersion: number
+  PaymentScheduleId: string
+  CollectionFrequency: string
+  ScheduleItems: ScheduleItem[]
+  ModifiedBy: string
+  ModifiedDate: string
+  [key: string]: unknown
+}
+
+const SAMPLE_SCHEDULE: PaymentSchedule = {
   $type: 'Stratos.Core.PolicyAdmin.CosmosDB.Documents.PaymentSchedules.PaymentScheduleCoreDocument, Stratos.Core.CosmosDB',
   PolicyNumber: 'OUTSTG00135448',
   RiskId: 1,
@@ -49,28 +109,39 @@ const SAMPLE_SCHEDULE = {
   id: 'Risk-1*1.0-Schedule',
 }
 
-function deepClone(obj) { return JSON.parse(JSON.stringify(obj)) }
+function deepClone<T>(obj: T): T { return JSON.parse(JSON.stringify(obj)) as T }
 
-function round2(n) { return Math.round((n + Number.EPSILON) * 100) / 100 }
+function round2(n: number): number { return Math.round((n + Number.EPSILON) * 100) / 100 }
 
 // Negates every numeric leaf, scaled by ratio (1 = full refund, <1 = pro-rated).
-function scaleAndNegateValues(obj, ratio) {
+function scaleAndNegateValues(obj: Record<string, unknown>, ratio: number): void {
   Object.keys(obj).forEach(key => {
-    if (typeof obj[key] === 'number') obj[key] = -round2(Math.abs(obj[key]) * ratio)
-    else if (typeof obj[key] === 'object' && obj[key] !== null) scaleAndNegateValues(obj[key], ratio)
+    const value = obj[key]
+    if (typeof value === 'number') obj[key] = -round2(Math.abs(value) * ratio)
+    else if (typeof value === 'object' && value !== null) scaleAndNegateValues(value as Record<string, unknown>, ratio)
   })
 }
 
-function toOffsetISOString(date) { return new Date(date).toISOString() }
+function toOffsetISOString(date: Date | string): string { return new Date(date).toISOString() }
 
-function prorataBase(item, prorataAmountType) {
+function prorataBase(item: ScheduleItem, prorataAmountType: ProrataAmountType): number {
   return prorataAmountType === 'gross' ? item.AmountDue : item.NetAmount
+}
+
+interface RatioFnArgs {
+  refundType: RefundType
+  prorataBasis: ProrataBasis
+  prorataAmountType: ProrataAmountType
+  prorataValue: string
+  selectedItems: number[]
+  loadedSchedule: PaymentSchedule
 }
 
 // Validates the pro-rata inputs and returns a ratio function to apply per selected
 // item, or an error message. Keeping this outside generateRefund (and returning a
 // pure function instead of closing over component state) keeps both small.
-function computeRefundRatioFn({ refundType, prorataBasis, prorataAmountType, prorataValue, selectedItems, loadedSchedule }) {
+function computeRefundRatioFn({ refundType, prorataBasis, prorataAmountType, prorataValue, selectedItems, loadedSchedule }: RatioFnArgs):
+  { ratioFn: ((item: ScheduleItem) => number) | null; error: string | null } {
   if (refundType !== 'prorated') return { ratioFn: () => 1, error: null }
 
   const val = Number.parseFloat(prorataValue)
@@ -97,12 +168,22 @@ function computeRefundRatioFn({ refundType, prorataBasis, prorataAmountType, pro
   return { ratioFn: item => val / prorataBase(item, prorataAmountType), error: null }
 }
 
-function buildRefundedSchedule({ loadedSchedule, selectedItems, ratioFn, modBy, nowIso, today, isoCreated }) {
+interface BuildRefundedScheduleArgs {
+  loadedSchedule: PaymentSchedule
+  selectedItems: number[]
+  ratioFn: (item: ScheduleItem) => number
+  modBy: string
+  nowIso: string
+  today: string
+  isoCreated: string | null
+}
+
+function buildRefundedSchedule({ loadedSchedule, selectedItems, ratioFn, modBy, nowIso, today, isoCreated }: BuildRefundedScheduleArgs) {
   const schedule = deepClone(loadedSchedule)
   schedule.ModifiedBy = modBy
   schedule.ModifiedDate = nowIso
 
-  const generatedRefundItems = []
+  const generatedRefundItems: ScheduleItem[] = []
   let totalRefundAmount = 0
 
   selectedItems.forEach(index => {
@@ -111,7 +192,7 @@ function buildRefundedSchedule({ loadedSchedule, selectedItems, ratioFn, modBy, 
     refundItem.Id = crypto.randomUUID()
     refundItem.AdjustmentDate = nowIso
     refundItem.DueDate = today
-    scaleAndNegateValues(refundItem, ratioFn(original))
+    scaleAndNegateValues(refundItem as unknown as Record<string, unknown>, ratioFn(original))
     refundItem.OriginalItem = deepClone(original)
     refundItem.CollectionItemCreatedDate = isoCreated || null
     totalRefundAmount += refundItem.AmountDue
@@ -122,7 +203,16 @@ function buildRefundedSchedule({ loadedSchedule, selectedItems, ratioFn, modBy, 
   return { schedule, generatedRefundItems, totalRefundAmount }
 }
 
-function buildCollectionDocuments({ schedule, generatedRefundItems, totalRefundAmount, modBy, nowIso, today }) {
+interface BuildCollectionDocumentsArgs {
+  schedule: PaymentSchedule
+  generatedRefundItems: ScheduleItem[]
+  totalRefundAmount: number
+  modBy: string
+  nowIso: string
+  today: string
+}
+
+function buildCollectionDocuments({ schedule, generatedRefundItems, totalRefundAmount, modBy, nowIso, today }: BuildCollectionDocumentsArgs) {
   const baseCollection = {
     BatchId: '00000000-0000-0000-0000-000000000000',
     CollectionId: schedule.PaymentScheduleId,
@@ -153,7 +243,7 @@ function buildCollectionDocuments({ schedule, generatedRefundItems, totalRefundA
   }
 
   // Collection item ids follow `Collection-{RiskId}-{Sequence}`; the historic
-  // (non-latest) record gets a status suffix, mirroring UpdateCollectionStatus.jsx.
+  // (non-latest) record gets a status suffix, mirroring UpdateCollectionStatus.tsx.
   const baseId = `Collection-${schedule.RiskId}-${baseCollection.Sequence}`
 
   const createdOutput = JSON.stringify({
@@ -176,13 +266,13 @@ function buildCollectionDocuments({ schedule, generatedRefundItems, totalRefundA
 
 export default function PaymentSchedule2Refund() {
   const [inputJson, setInputJson] = useState('')
-  const [loadedSchedule, setLoadedSchedule] = useState(null)
-  const [selectedItems, setSelectedItems] = useState([])
+  const [loadedSchedule, setLoadedSchedule] = useState<PaymentSchedule | null>(null)
+  const [selectedItems, setSelectedItems] = useState<number[]>([])
   const [modifiedBy, setModifiedBy] = usePersistedField(USER_EMAIL_KEY)
   const [collectionCreatedDate, setCollectionCreatedDate] = useState('')
-  const [refundType, setRefundType] = useState('full')
-  const [prorataBasis, setProrataBasis] = useState('percent')
-  const [prorataAmountType, setProrataAmountType] = useState('net')
+  const [refundType, setRefundType] = useState<RefundType>('full')
+  const [prorataBasis, setProrataBasis] = useState<ProrataBasis>('percent')
+  const [prorataAmountType, setProrataAmountType] = useState<ProrataAmountType>('net')
   const [prorataValue, setProrataValue] = useState('')
   const [scheduleOutput, setScheduleOutput] = useState('')
   const [createdOutput, setCreatedOutput] = useState('')
@@ -193,12 +283,12 @@ export default function PaymentSchedule2Refund() {
   function loadSchedule() {
     setLoadError('')
     try {
-      const parsed = JSON.parse(inputJson)
+      const parsed = JSON.parse(inputJson) as PaymentSchedule
       setLoadedSchedule(parsed)
       setSelectedItems([])
       setScheduleOutput(''); setCreatedOutput(''); setRefundedOutput('')
     } catch (e) {
-      setLoadError('Invalid JSON: ' + e.message)
+      setLoadError('Invalid JSON: ' + (e as Error).message)
     }
   }
 
@@ -211,7 +301,7 @@ export default function PaymentSchedule2Refund() {
     setLoadError('')
   }
 
-  function toggleItem(index) {
+  function toggleItem(index: number) {
     setSelectedItems(prev =>
       prev.includes(index) ? prev.filter(i => i !== index) : [...prev, index]
     )
@@ -226,7 +316,7 @@ export default function PaymentSchedule2Refund() {
     const { ratioFn, error } = computeRefundRatioFn({
       refundType, prorataBasis, prorataAmountType, prorataValue, selectedItems, loadedSchedule,
     })
-    if (error) { setGenError(error); return }
+    if (error || !ratioFn) { setGenError(error ?? 'Unable to compute refund ratio.'); return }
 
     const now = new Date()
     const nowIso = toOffsetISOString(now)
@@ -256,80 +346,79 @@ export default function PaymentSchedule2Refund() {
     : 'NetAmount'
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+    <div className="flex flex-col gap-5">
       {/* Top row: Input + Config */}
-      <div className="tool-grid-2">
+      <div className={toolGrid2}>
         {/* Schedule input */}
-        <div className="card">
-          <div className="card-title">
-            <span className="card-title-dot" /> Input Payment Schedule JSON
+        <div className={card}>
+          <div className={cardTitle}>
+            <span className={cardTitleDot} /> Input Payment Schedule JSON
           </div>
-          <div className="code-area-wrap">
+          <div className={codeAreaWrap}>
             <textarea
-              className="code-area"
-              style={{ minHeight: 280 }}
+              className={cx(codeArea, 'min-h-[280px]')}
               value={inputJson}
               onChange={e => { setInputJson(e.target.value); setLoadError('') }}
               placeholder="Paste the PaymentSchedule document here..."
             />
           </div>
-          <div className="btn-row">
-            <button type="button" className="btn btn-primary" onClick={loadSchedule}>Load Schedule</button>
-            <button type="button" className="btn btn-ghost" onClick={loadSample}>Load sample</button>
-            <button type="button" className="btn btn-ghost" onClick={() => { setInputJson(''); setLoadedSchedule(null); setSelectedItems([]); setScheduleOutput(''); setCreatedOutput(''); setRefundedOutput(''); setLoadError(''); setGenError(''); setRefundType('full'); setProrataBasis('percent'); setProrataAmountType('net'); setProrataValue('') }}>
+          <div className={btnRow}>
+            <button type="button" className={cx(btn, btnPrimary)} onClick={loadSchedule}>Load Schedule</button>
+            <button type="button" className={cx(btn, btnGhost)} onClick={loadSample}>Load sample</button>
+            <button type="button" className={cx(btn, btnGhost)} onClick={() => { setInputJson(''); setLoadedSchedule(null); setSelectedItems([]); setScheduleOutput(''); setCreatedOutput(''); setRefundedOutput(''); setLoadError(''); setGenError(''); setRefundType('full'); setProrataBasis('percent'); setProrataAmountType('net'); setProrataValue('') }}>
               Clear
             </button>
           </div>
-          {loadError && <div className="alert alert-error">{loadError}</div>}
+          {loadError && <div data-testid="alert-error" className={cx(alert, alertVariants.error)}>{loadError}</div>}
         </div>
 
         {/* Config + Schedule items */}
-        <div className="card">
-          <div className="card-title">
-            <span className="card-title-dot" /> Refund Configuration
+        <div className={card}>
+          <div className={cardTitle}>
+            <span className={cardTitleDot} /> Refund Configuration
           </div>
-          <div className="form-field">
-            <label className="form-label" htmlFor="ps-modified-by">Modified By (persisted)</label>
+          <div className={formField}>
+            <label className={formLabel} htmlFor="ps-modified-by">Modified By (persisted)</label>
             <input
               id="ps-modified-by"
-              className="form-input"
+              className={formInput}
               placeholder="email@company.ie"
               value={modifiedBy}
               onChange={e => setModifiedBy(e.target.value)}
             />
           </div>
-          <div className="form-field">
-            <label className="form-label" htmlFor="ps-collection-created-date">Collection Created Date (optional)</label>
-            <div style={{ display: 'flex', gap: 8 }}>
+          <div className={formField}>
+            <label className={formLabel} htmlFor="ps-collection-created-date">Collection Created Date (optional)</label>
+            <div className="flex gap-2">
               <input
                 id="ps-collection-created-date"
                 type="datetime-local"
                 step="1"
-                className="form-input"
+                className={formInput}
                 value={collectionCreatedDate}
                 onChange={e => setCollectionCreatedDate(e.target.value)}
               />
               <button
                 type="button"
-                className="btn btn-ghost"
+                className={cx(btn, btnGhost)}
                 onClick={() => setCollectionCreatedDate('')}
                 disabled={!collectionCreatedDate}
               >
                 Clear date
               </button>
             </div>
-            <p style={{ fontSize: '0.73rem', color: 'var(--text-muted)', marginTop: 5 }}>
+            <p className="text-[0.73rem] text-text-muted mt-[5px]">
               When set, generates Created &amp; Refunded collection documents.
             </p>
           </div>
 
-          <div className="divider" />
+          <div className={divider} />
 
-          <div className="card-title" style={{ marginBottom: 10 }}>
-            <span className="card-title-dot" /> Refund Type
+          <div className={cx(cardTitle, 'mb-[10px]')}>
+            <span className={cardTitleDot} /> Refund Type
           </div>
-          <div className="form-field" style={{ display: 'flex', gap: 16 }}>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.82rem', cursor: 'pointer' }}>
+          <div className={cx(formField, 'flex gap-4')}>
+            <label className="flex items-center gap-1.5 text-[0.82rem] cursor-pointer">
               <input
                 type="radio"
                 name="refundType"
@@ -337,7 +426,7 @@ export default function PaymentSchedule2Refund() {
                 onChange={() => setRefundType('full')}
               /> Full
             </label>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.82rem', cursor: 'pointer' }}>
+            <label className="flex items-center gap-1.5 text-[0.82rem] cursor-pointer">
               <input
                 type="radio"
                 name="refundType"
@@ -349,34 +438,34 @@ export default function PaymentSchedule2Refund() {
 
           {refundType === 'prorated' && (
             <>
-              <div className="form-field">
-                <label className="form-label" htmlFor="ps-prorata-basis">Pro-rata Basis</label>
+              <div className={formField}>
+                <label className={formLabel} htmlFor="ps-prorata-basis">Pro-rata Basis</label>
                 <select
                   id="ps-prorata-basis"
-                  className="form-input"
+                  className={formSelect}
                   value={prorataBasis}
-                  onChange={e => setProrataBasis(e.target.value)}
+                  onChange={e => setProrataBasis(e.target.value as ProrataBasis)}
                 >
                   <option value="percent">Percentage</option>
                   <option value="amount">Direct Amount</option>
                 </select>
               </div>
               {prorataBasis === 'amount' && (
-                <div className="form-field">
-                  <label className="form-label" htmlFor="ps-prorata-amount-type">Amount Type</label>
+                <div className={formField}>
+                  <label className={formLabel} htmlFor="ps-prorata-amount-type">Amount Type</label>
                   <select
                     id="ps-prorata-amount-type"
-                    className="form-input"
+                    className={formSelect}
                     value={prorataAmountType}
-                    onChange={e => setProrataAmountType(e.target.value)}
+                    onChange={e => setProrataAmountType(e.target.value as ProrataAmountType)}
                   >
                     <option value="net">Net Amount</option>
                     <option value="gross">Gross Amount (AmountDue)</option>
                   </select>
                 </div>
               )}
-              <div className="form-field">
-                <label className="form-label" htmlFor="ps-prorata-value">
+              <div className={formField}>
+                <label className={formLabel} htmlFor="ps-prorata-value">
                   {prorataBasis === 'percent' ? 'Pro-rata %' : `Pro-rata ${amountTypeShort} Amount`}
                 </label>
                 <input
@@ -385,12 +474,12 @@ export default function PaymentSchedule2Refund() {
                   step="0.01"
                   min="0"
                   max={prorataBasis === 'percent' ? 100 : undefined}
-                  className="form-input"
+                  className={formInput}
                   placeholder={prorataBasis === 'percent' ? 'e.g. 10' : 'e.g. 100.00'}
                   value={prorataValue}
                   onChange={e => setProrataValue(e.target.value)}
                 />
-                <p style={{ fontSize: '0.73rem', color: 'var(--text-muted)', marginTop: 5 }}>
+                <p className="text-[0.73rem] text-text-muted mt-[5px]">
                   {prorataBasis === 'percent'
                     ? 'Applied uniformly to AmountDue, TaxesAndLevies and AdminFees for every selected item.'
                     : `Ratio is derived from this item's ${amountTypeBasisDescription} and applied to every component. Only one item can be selected.`}
@@ -399,29 +488,30 @@ export default function PaymentSchedule2Refund() {
             </>
           )}
 
-          <div className="divider" />
+          <div className={divider} />
 
-          <div className="card-title" style={{ marginBottom: 10 }}>
-            <span className="card-title-dot green" /> Select Schedule Items to Refund
+          <div className={cx(cardTitle, 'mb-[10px]')}>
+            <span className={cardTitleDotGreen} /> Select Schedule Items to Refund
           </div>
 
           {!loadedSchedule ? (
-            <p style={{ color: 'var(--text-faint)', fontSize: '0.82rem', fontFamily: 'var(--font-mono)', padding: '12px 0' }}>
+            <p className="text-text-faint text-[0.82rem] font-mono py-3">
               Load a schedule to see items here.
             </p>
           ) : (
-            <div className="schedule-items-list">
+            <div data-testid="schedule-items-list" className={scheduleItemsList}>
               {loadedSchedule.ScheduleItems.map((item, i) => (
-                <label key={item.Id} className="schedule-item-check">
+                <label key={item.Id} className={scheduleItemCheck}>
                   <input
                     type="checkbox"
+                    className={scheduleItemCheckbox}
                     checked={selectedItems.includes(i)}
                     onChange={() => toggleItem(i)}
                   />
-                  <div className="item-info">
-                    <div className="item-id">{item.Id}</div>
+                  <div className={itemInfo}>
+                    <div className={itemId}>{item.Id}</div>
                     <div>
-                      <span className="item-amount">€{item.AmountDue}</span>
+                      <span className={itemAmount}>€{item.AmountDue}</span>
                       {' · Due: '}{item.DueDate}
                       {' · '}{item.PeriodStartDate} → {item.PeriodEndDate}
                     </div>
@@ -431,35 +521,35 @@ export default function PaymentSchedule2Refund() {
             </div>
           )}
 
-          <div className="btn-row">
+          <div className={btnRow}>
             <button
               type="button"
-              className="btn btn-primary"
+              className={cx(btn, btnPrimary)}
               onClick={generateRefund}
               disabled={!loadedSchedule || !modifiedBy || selectedItems.length === 0}
             >
               Generate Refund →
             </button>
           </div>
-          {genError && <div className="alert alert-error">{genError}</div>}
+          {genError && <div data-testid="alert-error" className={cx(alert, alertVariants.error)}>{genError}</div>}
         </div>
       </div>
 
       {/* Output: Schedule */}
-      <div className="card">
-        <div className="card-title">
-          <span className="card-title-dot green" /> Updated Schedule Output
+      <div className={card}>
+        <div className={cardTitle}>
+          <span className={cardTitleDotGreen} /> Updated Schedule Output
         </div>
-        <div className="code-area-wrap">
+        <div className={codeAreaWrap}>
           <textarea
-            className="code-area code-area-tall"
+            className={cx(codeArea, codeAreaTall)}
             value={scheduleOutput}
             readOnly
             placeholder="Updated schedule with refund items will appear here..."
           />
         </div>
         {scheduleOutput && (
-          <div style={{ marginTop: 10 }}>
+          <div className="mt-2.5">
             <CopyButton text={scheduleOutput} style={{ position: 'static', marginTop: 10 }} />
           </div>
         )}
@@ -467,40 +557,40 @@ export default function PaymentSchedule2Refund() {
 
       {/* Created + Refunded collection docs */}
       {(createdOutput || refundedOutput) && (
-        <div className="tool-grid-2">
-          <div className="card">
-            <div className="card-title">
-              <span className="card-title-dot" /> Created Collection Document
+        <div className={toolGrid2}>
+          <div className={card}>
+            <div className={cardTitle}>
+              <span className={cardTitleDot} /> Created Collection Document
             </div>
-            <div className="code-area-wrap">
+            <div className={codeAreaWrap}>
               <textarea
-                className="code-area code-area-tall"
+                className={cx(codeArea, codeAreaTall)}
                 value={createdOutput}
                 readOnly
                 placeholder="Created collection document..."
               />
             </div>
             {createdOutput && (
-              <div style={{ marginTop: 10 }}>
+              <div className="mt-2.5">
                 <CopyButton text={createdOutput} style={{ position: 'static', marginTop: 10 }} />
               </div>
             )}
           </div>
 
-          <div className="card">
-            <div className="card-title">
-              <span className="card-title-dot green" /> Refunded Collection Document
+          <div className={card}>
+            <div className={cardTitle}>
+              <span className={cardTitleDotGreen} /> Refunded Collection Document
             </div>
-            <div className="code-area-wrap">
+            <div className={codeAreaWrap}>
               <textarea
-                className="code-area code-area-tall"
+                className={cx(codeArea, codeAreaTall)}
                 value={refundedOutput}
                 readOnly
                 placeholder="Refunded collection document..."
               />
             </div>
             {refundedOutput && (
-              <div style={{ marginTop: 10 }}>
+              <div className="mt-2.5">
                 <CopyButton text={refundedOutput} style={{ position: 'static', marginTop: 10 }} />
               </div>
             )}

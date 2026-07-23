@@ -1,16 +1,83 @@
-import { useState } from 'react'
+import { useState, type ChangeEvent } from 'react'
+import { Check, Download } from 'lucide-react'
+import {
+  alert,
+  alertVariants,
+  btn,
+  btnPrimary,
+  btnRow,
+  btnSecondary,
+  card,
+  cardTitle,
+  cardTitleDot,
+  cardTitleDotGreen,
+  cx,
+  reconRowVariants,
+  reconStatusVariants,
+  statTile,
+  statTileLabel,
+  statTileRow,
+  statTileValue,
+  statusPill,
+  table,
+  tableWrap,
+  td,
+  tdFirst,
+  th,
+  thFirst,
+  theadRow,
+  toolGrid2,
+} from '../../ui'
 
 const RAW_REQUIRED_HEADERS = ['Dimension', 'Amount', 'GlEntry', 'BatchId']
 const JOURNAL_REQUIRED_HEADERS = ['ACCOUNTDISPLAYVALUE', 'ACCOUNTTYPE', 'DEBITAMOUNT', 'CREDITAMOUNT', 'DESCRIPTION']
 const TOLERANCE = 0.01
 
-function round2(n) { return Math.round((n + Number.EPSILON) * 100) / 100 }
+type CsvRow = Record<string, string>
+type ReconStatus = 'match' | 'mismatch' | 'raw-only' | 'journal-only'
+
+interface RawSummary {
+  byDim: Map<string, { debit: number; credit: number }>
+  byComponent: Map<string, { count: number; total: number }>
+  byOperation: Map<string, { count: number; total: number }>
+  batchIds: Set<string>
+  rowCount: number
+  totalDebit: number
+  totalCredit: number
+}
+
+interface JournalSummary {
+  byDim: Map<string, { debit: number; credit: number }>
+  bank: { account: string; debit: number; credit: number }[]
+  batchIds: Set<string>
+  rowCount: number
+  totalDebit: number
+  totalCredit: number
+}
+
+interface ReconRow {
+  dimension: string
+  rawDebit: number
+  jrnDebit: number
+  debitDiff: number
+  rawCredit: number
+  jrnCredit: number
+  creditDiff: number
+  status: ReconStatus
+}
+
+interface ReconResult {
+  rows: ReconRow[]
+  issues: string[]
+}
+
+function round2(n: number): number { return Math.round((n + Number.EPSILON) * 100) / 100 }
 
 // Splits raw CSV text into rows of raw (untrimmed) field arrays, honoring
 // RFC4180 quoting (quoted fields may contain commas/quotes/newlines).
-function tokenizeCsv(text) {
-  const rows = []
-  let row = []
+function tokenizeCsv(text: string): string[][] {
+  const rows: string[][] = []
+  let row: string[] = []
   let field = ''
   let inQuotes = false
   const pushField = () => { row.push(field); field = '' }
@@ -34,14 +101,14 @@ function tokenizeCsv(text) {
   return rows
 }
 
-function rowToObject(headers, cols) {
-  const obj = {}
+function rowToObject(headers: string[], cols: string[]): CsvRow {
+  const obj: CsvRow = {}
   headers.forEach((h, idx) => { obj[h] = (cols[idx] ?? '').trim() })
   return obj
 }
 
 // Small RFC4180-aware CSV parser: handles quoted fields (with embedded commas/quotes).
-function parseCsv(text) {
+function parseCsv(text: string): { headers: string[]; rows: CsvRow[] } {
   const rows = tokenizeCsv(text).filter(r => !(r.length === 1 && r[0] === ''))
   if (rows.length === 0) return { headers: [], rows: [] }
 
@@ -50,11 +117,11 @@ function parseCsv(text) {
   return { headers, rows: dataRows }
 }
 
-function buildRawSummary(rows) {
-  const byDim = new Map()
-  const byComponent = new Map()
-  const byOperation = new Map()
-  const batchIds = new Set()
+function buildRawSummary(rows: CsvRow[]): RawSummary {
+  const byDim = new Map<string, { debit: number; credit: number }>()
+  const byComponent = new Map<string, { count: number; total: number }>()
+  const byOperation = new Map<string, { count: number; total: number }>()
+  const batchIds = new Set<string>()
   let totalDebit = 0
   let totalCredit = 0
 
@@ -77,7 +144,7 @@ function buildRawSummary(rows) {
 
     if (!dim || (dir !== 'debit' && dir !== 'credit')) return
     if (!byDim.has(dim)) byDim.set(dim, { debit: 0, credit: 0 })
-    byDim.get(dim)[dir] += amt
+    byDim.get(dim)![dir] += amt
     if (dir === 'debit') totalDebit += amt; else totalCredit += amt
   })
 
@@ -89,10 +156,10 @@ function buildRawSummary(rows) {
   }
 }
 
-function buildJournalSummary(rows) {
-  const byDim = new Map()
-  const bankByAccount = new Map()
-  const batchIds = new Set()
+function buildJournalSummary(rows: CsvRow[]): JournalSummary {
+  const byDim = new Map<string, { debit: number; credit: number }>()
+  const bankByAccount = new Map<string, { debit: number; credit: number }>()
+  const batchIds = new Set<string>()
   let totalDebit = 0
   let totalCredit = 0
 
@@ -108,13 +175,13 @@ function buildJournalSummary(rows) {
       const dim = r.ACCOUNTDISPLAYVALUE
       if (!dim) return
       if (!byDim.has(dim)) byDim.set(dim, { debit: 0, credit: 0 })
-      byDim.get(dim).debit += debit
-      byDim.get(dim).credit += credit
+      byDim.get(dim)!.debit += debit
+      byDim.get(dim)!.credit += credit
     } else if (type === 'bank') {
       const account = r.ACCOUNTDISPLAYVALUE || '(unknown)'
       if (!bankByAccount.has(account)) bankByAccount.set(account, { debit: 0, credit: 0 })
-      bankByAccount.get(account).debit += debit
-      bankByAccount.get(account).credit += credit
+      bankByAccount.get(account)!.debit += debit
+      bankByAccount.get(account)!.credit += credit
     }
   })
 
@@ -130,9 +197,9 @@ function buildJournalSummary(rows) {
   }
 }
 
-function reconcile(rawSummary, journalSummary) {
+function reconcile(rawSummary: RawSummary, journalSummary: JournalSummary): ReconResult {
   const dims = new Set([...rawSummary.byDim.keys(), ...journalSummary.byDim.keys()])
-  const rows = [...dims].sort((a, b) => a.localeCompare(b)).map(dimension => {
+  const rows: ReconRow[] = [...dims].sort((a, b) => a.localeCompare(b)).map(dimension => {
     const raw = rawSummary.byDim.get(dimension)
     const jrn = journalSummary.byDim.get(dimension)
     const rawDebit = round2(raw?.debit || 0)
@@ -142,7 +209,7 @@ function reconcile(rawSummary, journalSummary) {
     const debitDiff = round2(rawDebit - jrnDebit)
     const creditDiff = round2(rawCredit - jrnCredit)
 
-    let status
+    let status: ReconStatus
     if (!raw) status = 'journal-only'
     else if (!jrn) status = 'raw-only'
     else if (Math.abs(debitDiff) > TOLERANCE || Math.abs(creditDiff) > TOLERANCE) status = 'mismatch'
@@ -151,7 +218,7 @@ function reconcile(rawSummary, journalSummary) {
     return { dimension, rawDebit, jrnDebit, debitDiff, rawCredit, jrnCredit, creditDiff, status }
   })
 
-  const issues = []
+  const issues: string[] = []
 
   rows.filter(r => r.status === 'mismatch').forEach(r => {
     issues.push(`Dimension "${r.dimension}" totals differ — raw debit ${r.rawDebit} vs journal ${r.jrnDebit} (Δ${r.debitDiff}), raw credit ${r.rawCredit} vs journal ${r.jrnCredit} (Δ${r.creditDiff})`)
@@ -184,7 +251,7 @@ function reconcile(rawSummary, journalSummary) {
   return { rows, issues }
 }
 
-function downloadCsv(filename, text) {
+function downloadCsv(filename: string, text: string) {
   const blob = new Blob([text], { type: 'text/csv' })
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a'); a.href = url; a.download = filename
@@ -192,16 +259,16 @@ function downloadCsv(filename, text) {
   URL.revokeObjectURL(url)
 }
 
-function StatTile({ label, value }) {
+function StatTile({ label, value }: { label: string; value: string }) {
   return (
-    <div className="stat-tile">
-      <div className="stat-tile-label">{label}</div>
-      <div className="stat-tile-value">{value}</div>
+    <div className={statTile}>
+      <div className={statTileLabel}>{label}</div>
+      <div className={statTileValue}>{value}</div>
     </div>
   )
 }
 
-const STATUS_LABEL = {
+const STATUS_LABEL: Record<ReconStatus, string> = {
   match: 'Match',
   mismatch: 'Mismatch',
   'raw-only': 'Raw only',
@@ -210,17 +277,24 @@ const STATUS_LABEL = {
 
 export default function ShadowLedgerReconciliation() {
   const [rawFileName, setRawFileName] = useState('')
-  const [rawSummary, setRawSummary] = useState(null)
+  const [rawSummary, setRawSummary] = useState<RawSummary | null>(null)
   const [rawError, setRawError] = useState('')
 
   const [journalFileName, setJournalFileName] = useState('')
-  const [journalSummary, setJournalSummary] = useState(null)
+  const [journalSummary, setJournalSummary] = useState<JournalSummary | null>(null)
   const [journalError, setJournalError] = useState('')
 
-  const [result, setResult] = useState(null)
+  const [result, setResult] = useState<ReconResult | null>(null)
   const [downloaded, setDownloaded] = useState(false)
 
-  async function handleFile(file, requiredHeaders, buildSummary, setFileName, setSummary, setError) {
+  async function handleFile<S>(
+    file: File | undefined,
+    requiredHeaders: string[],
+    buildSummary: (rows: CsvRow[]) => S,
+    setFileName: (v: string) => void,
+    setSummary: (v: S | null) => void,
+    setError: (v: string) => void,
+  ) {
     setResult(null)
     if (!file) return
     setFileName(file.name)
@@ -233,16 +307,16 @@ export default function ShadowLedgerReconciliation() {
       setSummary(buildSummary(rows))
     } catch (err) {
       setSummary(null)
-      setError(err.message || 'Could not read file.')
+      setError((err as Error).message || 'Could not read file.')
     }
   }
 
-  function handleRawFile(e) {
-    handleFile(e.target.files[0], RAW_REQUIRED_HEADERS, buildRawSummary, setRawFileName, setRawSummary, setRawError)
+  function handleRawFile(e: ChangeEvent<HTMLInputElement>) {
+    void handleFile(e.target.files?.[0], RAW_REQUIRED_HEADERS, buildRawSummary, setRawFileName, setRawSummary, setRawError)
   }
 
-  function handleJournalFile(e) {
-    handleFile(e.target.files[0], JOURNAL_REQUIRED_HEADERS, buildJournalSummary, setJournalFileName, setJournalSummary, setJournalError)
+  function handleJournalFile(e: ChangeEvent<HTMLInputElement>) {
+    void handleFile(e.target.files?.[0], JOURNAL_REQUIRED_HEADERS, buildJournalSummary, setJournalFileName, setJournalSummary, setJournalError)
   }
 
   function runReconcile() {
@@ -261,41 +335,41 @@ export default function ShadowLedgerReconciliation() {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-      <div className="tool-grid-2">
-        <div className="card">
-          <div className="card-title">
-            <span className="card-title-dot" /> Collection Items Export (Raw CSV)
+    <div className="flex flex-col gap-5">
+      <div className={toolGrid2}>
+        <div data-testid="card" className={card}>
+          <div className={cardTitle}>
+            <span className={cardTitleDot} /> Collection Items Export (Raw CSV)
           </div>
           <input type="file" accept=".csv" onChange={handleRawFile} />
-          {rawFileName && <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: 8 }}>{rawFileName}</p>}
+          {rawFileName && <p className="text-[0.78rem] text-text-muted mt-2">{rawFileName}</p>}
           {rawSummary && (
-            <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: 4, fontFamily: 'var(--font-mono)' }}>
+            <p className="text-[0.78rem] text-text-muted mt-1 font-mono">
               {rawSummary.rowCount.toLocaleString()} rows · {rawSummary.byDim.size} dimensions · batch {[...rawSummary.batchIds].join(', ') || 'n/a'}
             </p>
           )}
-          {rawError && <div className="alert alert-error">{rawError}</div>}
+          {rawError && <div data-testid="alert-error" className={cx(alert, alertVariants.error)}>{rawError}</div>}
         </div>
 
-        <div className="card">
-          <div className="card-title">
-            <span className="card-title-dot green" /> D365 GL Journal Export
+        <div data-testid="card" className={card}>
+          <div className={cardTitle}>
+            <span className={cardTitleDotGreen} /> D365 GL Journal Export
           </div>
           <input type="file" accept=".csv" onChange={handleJournalFile} />
-          {journalFileName && <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: 8 }}>{journalFileName}</p>}
+          {journalFileName && <p className="text-[0.78rem] text-text-muted mt-2">{journalFileName}</p>}
           {journalSummary && (
-            <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: 4, fontFamily: 'var(--font-mono)' }}>
+            <p className="text-[0.78rem] text-text-muted mt-1 font-mono">
               {journalSummary.rowCount.toLocaleString()} rows · {journalSummary.byDim.size} dimensions · batch {[...journalSummary.batchIds].join(', ') || 'n/a'}
             </p>
           )}
-          {journalError && <div className="alert alert-error">{journalError}</div>}
+          {journalError && <div data-testid="alert-error" className={cx(alert, alertVariants.error)}>{journalError}</div>}
         </div>
       </div>
 
-      <div className="btn-row">
+      <div className={btnRow}>
         <button
           type="button"
-          className="btn btn-primary"
+          className={cx(btn, btnPrimary)}
           onClick={runReconcile}
           disabled={!rawSummary || !journalSummary}
         >
@@ -303,24 +377,24 @@ export default function ShadowLedgerReconciliation() {
         </button>
       </div>
 
-      {result && (
+      {result && rawSummary && journalSummary && (
         <>
-          <div className="card">
-            <div className="card-title">
-              <span className={`card-title-dot ${result.issues.length === 0 ? 'green' : ''}`} /> Reconciliation Result
+          <div className={card}>
+            <div className={cardTitle}>
+              <span className={result.issues.length === 0 ? cardTitleDotGreen : cardTitleDot} /> Reconciliation Result
             </div>
             {result.issues.length === 0 ? (
-              <div className="alert alert-success">✓ All checks passed — no discrepancies found.</div>
+              <div className={cx(alert, alertVariants.success)}>✓ All checks passed — no discrepancies found.</div>
             ) : (
-              <div className="alert alert-error">
+              <div data-testid="alert-error" className={cx(alert, alertVariants.error)}>
                 <strong>{result.issues.length} issue{result.issues.length === 1 ? '' : 's'} found:</strong>
-                <ul>
-                  {result.issues.map(issue => <li key={issue}>{issue}</li>)}
+                <ul className="mt-1 pl-[18px]">
+                  {result.issues.map(issue => <li className="my-0.5" key={issue}>{issue}</li>)}
                 </ul>
               </div>
             )}
 
-            <div className="stat-tile-row">
+            <div className={statTileRow}>
               <StatTile label="Raw rows" value={rawSummary.rowCount.toLocaleString()} />
               <StatTile label="Raw total debit" value={rawSummary.totalDebit.toLocaleString()} />
               <StatTile label="Raw total credit" value={rawSummary.totalCredit.toLocaleString()} />
@@ -331,23 +405,23 @@ export default function ShadowLedgerReconciliation() {
           </div>
 
           {(rawSummary.byComponent.size > 0 || rawSummary.byOperation.size > 0) && (
-            <div className="tool-grid-2">
+            <div className={toolGrid2}>
               {rawSummary.byComponent.size > 0 && (
-                <div className="card">
-                  <div className="card-title">
-                    <span className="card-title-dot" /> Raw Breakdown by Amount Component
+                <div className={card}>
+                  <div className={cardTitle}>
+                    <span className={cardTitleDot} /> Raw Breakdown by Amount Component
                   </div>
-                  <div className="recon-table-wrap">
-                    <table className="recon-table">
+                  <div className={tableWrap}>
+                    <table className={table}>
                       <thead>
-                        <tr><th>Component</th><th>Count</th><th>Total</th></tr>
+                        <tr className={theadRow}><th className={thFirst}>Component</th><th className={th}>Count</th><th className={th}>Total</th></tr>
                       </thead>
                       <tbody>
                         {[...rawSummary.byComponent.entries()].map(([name, v]) => (
                           <tr key={name}>
-                            <td>{name}</td>
-                            <td>{v.count}</td>
-                            <td>{round2(v.total)}</td>
+                            <td className={tdFirst}>{name}</td>
+                            <td className={td}>{v.count}</td>
+                            <td className={td}>{round2(v.total)}</td>
                           </tr>
                         ))}
                       </tbody>
@@ -356,21 +430,21 @@ export default function ShadowLedgerReconciliation() {
                 </div>
               )}
               {rawSummary.byOperation.size > 0 && (
-                <div className="card">
-                  <div className="card-title">
-                    <span className="card-title-dot" /> Raw Breakdown by Operation
+                <div className={card}>
+                  <div className={cardTitle}>
+                    <span className={cardTitleDot} /> Raw Breakdown by Operation
                   </div>
-                  <div className="recon-table-wrap">
-                    <table className="recon-table">
+                  <div className={tableWrap}>
+                    <table className={table}>
                       <thead>
-                        <tr><th>Operation</th><th>Count</th><th>Total</th></tr>
+                        <tr className={theadRow}><th className={thFirst}>Operation</th><th className={th}>Count</th><th className={th}>Total</th></tr>
                       </thead>
                       <tbody>
                         {[...rawSummary.byOperation.entries()].map(([name, v]) => (
                           <tr key={name}>
-                            <td>{name}</td>
-                            <td>{v.count}</td>
-                            <td>{round2(v.total)}</td>
+                            <td className={tdFirst}>{name}</td>
+                            <td className={td}>{v.count}</td>
+                            <td className={td}>{round2(v.total)}</td>
                           </tr>
                         ))}
                       </tbody>
@@ -382,21 +456,21 @@ export default function ShadowLedgerReconciliation() {
           )}
 
           {journalSummary.bank.length > 0 && (
-            <div className="card">
-              <div className="card-title">
-                <span className="card-title-dot" /> Journal Bank Lines
+            <div className={card}>
+              <div className={cardTitle}>
+                <span className={cardTitleDot} /> Journal Bank Lines
               </div>
-              <div className="recon-table-wrap">
-                <table className="recon-table">
+              <div className={tableWrap}>
+                <table className={table}>
                   <thead>
-                    <tr><th>Account</th><th>Debit</th><th>Credit</th></tr>
+                    <tr className={theadRow}><th className={thFirst}>Account</th><th className={th}>Debit</th><th className={th}>Credit</th></tr>
                   </thead>
                   <tbody>
                     {journalSummary.bank.map(b => (
                       <tr key={b.account}>
-                        <td>{b.account}</td>
-                        <td>{b.debit}</td>
-                        <td>{b.credit}</td>
+                        <td className={tdFirst}>{b.account}</td>
+                        <td className={td}>{b.debit}</td>
+                        <td className={td}>{b.credit}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -405,43 +479,44 @@ export default function ShadowLedgerReconciliation() {
             </div>
           )}
 
-          <div className="card">
-            <div className="card-title">
-              <span className="card-title-dot" /> Dimension Comparison
+          <div className={card}>
+            <div className={cardTitle}>
+              <span className={cardTitleDot} /> Dimension Comparison
             </div>
-            <div className="recon-table-wrap">
-              <table className="recon-table">
+            <div className={tableWrap}>
+              <table className={table}>
                 <thead>
-                  <tr>
-                    <th>Dimension</th>
-                    <th>Raw Debit</th>
-                    <th>Journal Debit</th>
-                    <th>Δ Debit</th>
-                    <th>Raw Credit</th>
-                    <th>Journal Credit</th>
-                    <th>Δ Credit</th>
-                    <th>Status</th>
+                  <tr className={theadRow}>
+                    <th className={thFirst}>Dimension</th>
+                    <th className={th}>Raw Debit</th>
+                    <th className={th}>Journal Debit</th>
+                    <th className={th}>Δ Debit</th>
+                    <th className={th}>Raw Credit</th>
+                    <th className={th}>Journal Credit</th>
+                    <th className={th}>Δ Credit</th>
+                    <th className={th}>Status</th>
                   </tr>
                 </thead>
                 <tbody>
                   {result.rows.map(r => (
-                    <tr key={r.dimension} className={`recon-row-${r.status}`}>
-                      <td>{r.dimension}</td>
-                      <td>{r.rawDebit}</td>
-                      <td>{r.jrnDebit}</td>
-                      <td>{r.debitDiff}</td>
-                      <td>{r.rawCredit}</td>
-                      <td>{r.jrnCredit}</td>
-                      <td>{r.creditDiff}</td>
-                      <td><span className={`recon-status recon-status-${r.status}`}>{STATUS_LABEL[r.status]}</span></td>
+                    <tr key={r.dimension} className={reconRowVariants[r.status]}>
+                      <td className={tdFirst}>{r.dimension}</td>
+                      <td className={td}>{r.rawDebit}</td>
+                      <td className={td}>{r.jrnDebit}</td>
+                      <td className={td}>{r.debitDiff}</td>
+                      <td className={td}>{r.rawCredit}</td>
+                      <td className={td}>{r.jrnCredit}</td>
+                      <td className={td}>{r.creditDiff}</td>
+                      <td className={td}><span className={cx(statusPill, reconStatusVariants[r.status])}>{STATUS_LABEL[r.status]}</span></td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
-            <div className="btn-row">
-              <button type="button" className="btn btn-secondary" onClick={handleDownload}>
-                {downloaded ? '✓ Downloaded' : '⬇ Download comparison as CSV'}
+            <div className={btnRow}>
+              <button type="button" className={cx(btn, btnSecondary)} onClick={handleDownload}>
+                {downloaded ? <Check size={14} /> : <Download size={14} />}
+                {downloaded ? 'Downloaded' : 'Download comparison as CSV'}
               </button>
             </div>
           </div>

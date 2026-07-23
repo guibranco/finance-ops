@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
-import PaymentSchedule2Refund from '../../src/components/tools/PaymentSchedule2Refund.jsx'
+import PaymentSchedule2Refund from '../../src/components/tools/PaymentSchedule2Refund.tsx'
 
 // ── Fixtures ───────────────────────────────────────────────────────────────
 const SCHEDULE = {
@@ -52,7 +52,7 @@ const loadSchedule = (schedule = SCHEDULE) => {
 }
 
 const getScheduleOutput = () =>
-  JSON.parse(screen.getByPlaceholderText(/updated schedule with refund items/i).value)
+  JSON.parse(screen.getByPlaceholderText<HTMLTextAreaElement>(/updated schedule with refund items/i).value)
 
 const fillModifiedBy = (value = 'refunder@test.ie') => {
   fireEvent.change(screen.getByPlaceholderText('email@company.ie'), {
@@ -70,7 +70,7 @@ describe('PaymentSchedule2Refund', () => {
   it('renders the modifiedBy and collectionCreatedDate inputs', () => {
     render(<PaymentSchedule2Refund />)
     expect(screen.getByPlaceholderText('email@company.ie')).toBeInTheDocument()
-    expect(document.querySelector('input[type="datetime-local"]')).toBeInTheDocument()
+    expect(document.querySelector<HTMLInputElement>('input[type="datetime-local"]')!).toBeInTheDocument()
   })
 
   it('disables the collection date Clear button when the date is empty', () => {
@@ -80,7 +80,7 @@ describe('PaymentSchedule2Refund', () => {
 
   it('clears the collection created date on Clear button click', () => {
     render(<PaymentSchedule2Refund />)
-    const dateInput = document.querySelector('input[type="datetime-local"]')
+    const dateInput = document.querySelector<HTMLInputElement>('input[type="datetime-local"]')!
     fireEvent.change(dateInput, { target: { value: '2024-09-01T10:00' } })
     expect(dateInput).toHaveValue('2024-09-01T10:00')
 
@@ -112,7 +112,7 @@ describe('PaymentSchedule2Refund', () => {
   it('displays item UUIDs in the checkbox labels', () => {
     render(<PaymentSchedule2Refund />)
     loadSchedule()
-    const list = document.querySelector('.schedule-items-list')
+    const list = document.querySelector<HTMLElement>('[data-testid="schedule-items-list"]')!
     expect(within(list).getByText('item-id-aaa')).toBeInTheDocument()
     expect(within(list).getByText('item-id-bbb')).toBeInTheDocument()
   })
@@ -266,7 +266,7 @@ describe('PaymentSchedule2Refund', () => {
     render(<PaymentSchedule2Refund />)
     fireEvent.click(screen.getByLabelText('Pro-rated'))
     expect(screen.getByRole('combobox')).toBeInTheDocument()
-    expect(document.querySelector('input[type="number"]')).toBeInTheDocument()
+    expect(document.querySelector<HTMLInputElement>('input[type="number"]')!).toBeInTheDocument()
   })
 
   it('computes a pro-rata refund from a percentage, scaling every component by the same ratio', () => {
@@ -275,7 +275,7 @@ describe('PaymentSchedule2Refund', () => {
     fireEvent.click(screen.getAllByRole('checkbox')[0]) // item-id-aaa: AmountDue 200, NetAmount 190, LVY 10
     fillModifiedBy()
     fireEvent.click(screen.getByLabelText('Pro-rated'))
-    fireEvent.change(document.querySelector('input[type="number"]'), { target: { value: '10' } })
+    fireEvent.change(document.querySelector<HTMLInputElement>('input[type="number"]')!, { target: { value: '10' } })
     fireEvent.click(screen.getByText(/generate refund/i))
 
     const refundItem = getScheduleOutput().ScheduleItems[2]
@@ -292,7 +292,7 @@ describe('PaymentSchedule2Refund', () => {
     fillModifiedBy()
     fireEvent.click(screen.getByLabelText('Pro-rated'))
     fireEvent.change(screen.getByRole('combobox'), { target: { value: 'amount' } })
-    fireEvent.change(document.querySelector('input[type="number"]'), { target: { value: '19' } }) // 10% of 190
+    fireEvent.change(document.querySelector<HTMLInputElement>('input[type="number"]')!, { target: { value: '19' } }) // 10% of 190
     fireEvent.click(screen.getByText(/generate refund/i))
 
     const refundItem = getScheduleOutput().ScheduleItems[2]
@@ -309,7 +309,7 @@ describe('PaymentSchedule2Refund', () => {
     fireEvent.click(screen.getByLabelText('Pro-rated'))
     fireEvent.change(screen.getByRole('combobox'), { target: { value: 'amount' } }) // Pro-rata Basis
     fireEvent.change(screen.getByDisplayValue('Net Amount'), { target: { value: 'gross' } }) // Amount Type
-    fireEvent.change(document.querySelector('input[type="number"]'), { target: { value: '20' } }) // 10% of 200 gross
+    fireEvent.change(document.querySelector<HTMLInputElement>('input[type="number"]')!, { target: { value: '20' } }) // 10% of 200 gross
     fireEvent.click(screen.getByText(/generate refund/i))
 
     const refundItem = getScheduleOutput().ScheduleItems[2]
@@ -326,7 +326,7 @@ describe('PaymentSchedule2Refund', () => {
     fillModifiedBy()
     fireEvent.click(screen.getByLabelText('Pro-rated'))
     fireEvent.change(screen.getByRole('combobox'), { target: { value: 'amount' } })
-    fireEvent.change(document.querySelector('input[type="number"]'), { target: { value: '19' } })
+    fireEvent.change(document.querySelector<HTMLInputElement>('input[type="number"]')!, { target: { value: '19' } })
     fireEvent.click(screen.getByText(/generate refund/i))
 
     expect(screen.getByText(/only supports a single selected item/i)).toBeInTheDocument()
@@ -349,7 +349,7 @@ describe('PaymentSchedule2Refund', () => {
     fireEvent.click(screen.getAllByRole('checkbox')[0]) // AmountDue 200
     fillModifiedBy()
     fireEvent.click(screen.getByLabelText('Pro-rated'))
-    fireEvent.change(document.querySelector('input[type="number"]'), { target: { value: '150' } })
+    fireEvent.change(document.querySelector<HTMLInputElement>('input[type="number"]')!, { target: { value: '150' } })
     fireEvent.click(screen.getByText(/generate refund/i))
 
     expect(screen.getByText(/cannot exceed 100%/i)).toBeInTheDocument()
@@ -369,7 +369,7 @@ describe('PaymentSchedule2Refund', () => {
 
   it('generates Created and Refunded collection documents when date is provided', () => {
     render(<PaymentSchedule2Refund />)
-    fireEvent.change(document.querySelector('input[type="datetime-local"]'), {
+    fireEvent.change(document.querySelector<HTMLInputElement>('input[type="datetime-local"]')!, {
       target: { value: '2024-09-01T10:00' },
     })
     loadSchedule()
@@ -382,29 +382,29 @@ describe('PaymentSchedule2Refund', () => {
 
   it('Created collection document has CollectionStatus="Created" and IsLatest=false', () => {
     render(<PaymentSchedule2Refund />)
-    fireEvent.change(document.querySelector('input[type="datetime-local"]'), {
+    fireEvent.change(document.querySelector<HTMLInputElement>('input[type="datetime-local"]')!, {
       target: { value: '2024-09-01T10:00' },
     })
     loadSchedule()
     fireEvent.click(screen.getAllByRole('checkbox')[0])
     fillModifiedBy()
     fireEvent.click(screen.getByText(/generate refund/i))
-    const created = JSON.parse(screen.getByPlaceholderText(/created collection document/i).value)
+    const created = JSON.parse(screen.getByPlaceholderText<HTMLTextAreaElement>(/created collection document/i).value)
     expect(created.CollectionStatus).toBe('Created')
     expect(created.IsLatest).toBe(false)
   })
 
   it('gives Created/Refunded collection documents ids matching the Collection-{RiskId}-{Sequence} pattern, not a GUID', () => {
     render(<PaymentSchedule2Refund />)
-    fireEvent.change(document.querySelector('input[type="datetime-local"]'), {
+    fireEvent.change(document.querySelector<HTMLInputElement>('input[type="datetime-local"]')!, {
       target: { value: '2024-09-01T10:00' },
     })
     loadSchedule()
     fireEvent.click(screen.getAllByRole('checkbox')[0])
     fillModifiedBy()
     fireEvent.click(screen.getByText(/generate refund/i))
-    const created = JSON.parse(screen.getByPlaceholderText(/created collection document/i).value)
-    const refunded = JSON.parse(screen.getByPlaceholderText(/refunded collection document/i).value)
+    const created = JSON.parse(screen.getByPlaceholderText<HTMLTextAreaElement>(/created collection document/i).value)
+    const refunded = JSON.parse(screen.getByPlaceholderText<HTMLTextAreaElement>(/refunded collection document/i).value)
     // RiskId 1, Sequence 1 in the fixture schedule
     expect(refunded.id).toBe('Collection-1-1')
     expect(created.id).toBe('Collection-1-1-Created')
@@ -412,28 +412,28 @@ describe('PaymentSchedule2Refund', () => {
 
   it('Refunded collection document has CollectionStatus="Refunded" and IsLatest=true', () => {
     render(<PaymentSchedule2Refund />)
-    fireEvent.change(document.querySelector('input[type="datetime-local"]'), {
+    fireEvent.change(document.querySelector<HTMLInputElement>('input[type="datetime-local"]')!, {
       target: { value: '2024-09-01T10:00' },
     })
     loadSchedule()
     fireEvent.click(screen.getAllByRole('checkbox')[0])
     fillModifiedBy()
     fireEvent.click(screen.getByText(/generate refund/i))
-    const refunded = JSON.parse(screen.getByPlaceholderText(/refunded collection document/i).value)
+    const refunded = JSON.parse(screen.getByPlaceholderText<HTMLTextAreaElement>(/refunded collection document/i).value)
     expect(refunded.CollectionStatus).toBe('Refunded')
     expect(refunded.IsLatest).toBe(true)
   })
 
   it('collection documents carry negative total AmountDue', () => {
     render(<PaymentSchedule2Refund />)
-    fireEvent.change(document.querySelector('input[type="datetime-local"]'), {
+    fireEvent.change(document.querySelector<HTMLInputElement>('input[type="datetime-local"]')!, {
       target: { value: '2024-09-01T10:00' },
     })
     loadSchedule()
     fireEvent.click(screen.getAllByRole('checkbox')[0]) // AmountDue 200 → -200
     fillModifiedBy()
     fireEvent.click(screen.getByText(/generate refund/i))
-    const created = JSON.parse(screen.getByPlaceholderText(/created collection document/i).value)
+    const created = JSON.parse(screen.getByPlaceholderText<HTMLTextAreaElement>(/created collection document/i).value)
     expect(created.AmountDue).toBe(-200)
   })
 

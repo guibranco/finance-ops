@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
-import CollectionItem2ResubmissionItem from '../../src/components/tools/CollectionItem2ResubmissionItem.jsx'
+import CollectionItem2ResubmissionItem from '../../src/components/tools/CollectionItem2ResubmissionItem.tsx'
 
 const VALID_INPUT = JSON.stringify({
   BatchId: '00000000-0000-0000-0000-000000000000',
@@ -110,14 +110,14 @@ describe('CollectionItem2ResubmissionItem', () => {
   it('produces output with correct Sequence from input', () => {
     render(<CollectionItem2ResubmissionItem />)
     fillAndConvert(VALID_INPUT, 'user@test.ie', '1')
-    const result = JSON.parse(screen.getByPlaceholderText(/resubmission json will appear/i).value)
+    const result = JSON.parse(screen.getByPlaceholderText<HTMLTextAreaElement>(/resubmission json will appear/i).value)
     expect(result.Sequence).toBe(1)
   })
 
   it('sets id as Resubmission-{RiskId}-{Sequence}', () => {
     render(<CollectionItem2ResubmissionItem />)
     fillAndConvert(VALID_INPUT, 'user@test.ie', '3')
-    const result = JSON.parse(screen.getByPlaceholderText(/resubmission json will appear/i).value)
+    const result = JSON.parse(screen.getByPlaceholderText<HTMLTextAreaElement>(/resubmission json will appear/i).value)
     expect(result.id).toBe('Resubmission-2-3')
     expect(result.Sequence).toBe(3)
   })
@@ -125,7 +125,7 @@ describe('CollectionItem2ResubmissionItem', () => {
   it('sets CreatedBy and ModifiedBy from the email field', () => {
     render(<CollectionItem2ResubmissionItem />)
     fillAndConvert(VALID_INPUT, 'ops@company.ie', '1')
-    const result = JSON.parse(screen.getByPlaceholderText(/resubmission json will appear/i).value)
+    const result = JSON.parse(screen.getByPlaceholderText<HTMLTextAreaElement>(/resubmission json will appear/i).value)
     expect(result.CreatedBy).toBe('ops@company.ie')
     expect(result.ModifiedBy).toBe('ops@company.ie')
   })
@@ -133,7 +133,7 @@ describe('CollectionItem2ResubmissionItem', () => {
   it('always sets IsProcessed and IsVoided to false', () => {
     render(<CollectionItem2ResubmissionItem />)
     fillAndConvert()
-    const result = JSON.parse(screen.getByPlaceholderText(/resubmission json will appear/i).value)
+    const result = JSON.parse(screen.getByPlaceholderText<HTMLTextAreaElement>(/resubmission json will appear/i).value)
     expect(result.IsProcessed).toBe(false)
     expect(result.IsVoided).toBe(false)
   })
@@ -141,14 +141,14 @@ describe('CollectionItem2ResubmissionItem', () => {
   it('sets IsOriginalPaymentDirectDebit to false', () => {
     render(<CollectionItem2ResubmissionItem />)
     fillAndConvert()
-    const result = JSON.parse(screen.getByPlaceholderText(/resubmission json will appear/i).value)
+    const result = JSON.parse(screen.getByPlaceholderText<HTMLTextAreaElement>(/resubmission json will appear/i).value)
     expect(result.IsOriginalPaymentDirectDebit).toBe(false)
   })
 
   it('maps CollectionId, PaymentScheduleItemIds, PolicyNumber, RiskId, RiskCode, RiskMajorVersion', () => {
     render(<CollectionItem2ResubmissionItem />)
     fillAndConvert()
-    const result = JSON.parse(screen.getByPlaceholderText(/resubmission json will appear/i).value)
+    const result = JSON.parse(screen.getByPlaceholderText<HTMLTextAreaElement>(/resubmission json will appear/i).value)
     expect(result.CollectionId).toBe('coll-abc-123')
     expect(result.PaymentScheduleItemIds).toEqual(['item-1', 'item-2'])
     expect(result.PolicyNumber).toBe('OUTINT00172379')
@@ -160,7 +160,7 @@ describe('CollectionItem2ResubmissionItem', () => {
   it('maps OriginalAmountDue and OriginalDueDate from source', () => {
     render(<CollectionItem2ResubmissionItem />)
     fillAndConvert()
-    const result = JSON.parse(screen.getByPlaceholderText(/resubmission json will appear/i).value)
+    const result = JSON.parse(screen.getByPlaceholderText<HTMLTextAreaElement>(/resubmission json will appear/i).value)
     expect(result.OriginalAmountDue).toBe(108.53)
     expect(result.OriginalDueDate).toBe('2024-08-08')
   })
@@ -168,21 +168,21 @@ describe('CollectionItem2ResubmissionItem', () => {
   it('sets VoidedDate to the zero-time sentinel', () => {
     render(<CollectionItem2ResubmissionItem />)
     fillAndConvert()
-    const result = JSON.parse(screen.getByPlaceholderText(/resubmission json will appear/i).value)
+    const result = JSON.parse(screen.getByPlaceholderText<HTMLTextAreaElement>(/resubmission json will appear/i).value)
     expect(result.VoidedDate).toBe('0001-01-01T00:00:00+00:00')
   })
 
   it('sets ResubmissionDueDate to today (YYYY-MM-DD)', () => {
     render(<CollectionItem2ResubmissionItem />)
     fillAndConvert()
-    const result = JSON.parse(screen.getByPlaceholderText(/resubmission json will appear/i).value)
+    const result = JSON.parse(screen.getByPlaceholderText<HTMLTextAreaElement>(/resubmission json will appear/i).value)
     expect(result.ResubmissionDueDate).toMatch(/^\d{4}-\d{2}-\d{2}$/)
   })
 
   it('CreatedDate and ModifiedDate are ISO-8601 strings', () => {
     render(<CollectionItem2ResubmissionItem />)
     fillAndConvert()
-    const result = JSON.parse(screen.getByPlaceholderText(/resubmission json will appear/i).value)
+    const result = JSON.parse(screen.getByPlaceholderText<HTMLTextAreaElement>(/resubmission json will appear/i).value)
     expect(result.CreatedDate).toMatch(/^\d{4}-\d{2}-\d{2}T/)
     expect(result.ModifiedDate).toMatch(/^\d{4}-\d{2}-\d{2}T/)
   })
@@ -206,7 +206,7 @@ describe('CollectionItem2ResubmissionItem', () => {
   it('populates textarea with sample data on Load sample click', () => {
     render(<CollectionItem2ResubmissionItem />)
     fireEvent.click(screen.getByText('Load sample'))
-    const ta = screen.getByPlaceholderText(/rejected collection json here/i)
+    const ta = screen.getByPlaceholderText<HTMLTextAreaElement>(/rejected collection json here/i)
     expect(ta.value).toContain('OUTINT00172379')
   })
 

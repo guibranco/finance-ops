@@ -2,6 +2,39 @@ import { useState } from 'react'
 import { usePersistedField, USER_EMAIL_KEY } from '../../hooks/usePersistedField'
 import CopyButton from '../CopyButton'
 import RulesGrid from '../RulesGrid'
+import {
+  alert,
+  alertVariants,
+  btn,
+  btnGhost,
+  btnPrimary,
+  btnRow,
+  card,
+  cardTitle,
+  cardTitleDot,
+  cardTitleDotGreen,
+  codeArea,
+  codeAreaTall,
+  codeAreaWrap,
+  cx,
+  formField,
+  formInput,
+  formLabel,
+  toolGrid2,
+} from '../../ui'
+
+interface CollectionInput {
+  CollectionId: string
+  PaymentScheduleItemIds: string[]
+  PolicyNumber: string
+  RiskId: number
+  RiskMajorVersion: number
+  RiskCode: string
+  TransactionReference: string
+  AmountDue: number
+  Fee: number | null
+  DueDate: string
+}
 
 const SAMPLE_INPUT = JSON.stringify({
   BatchId: '00000000-0000-0000-0000-000000000000',
@@ -22,8 +55,8 @@ const SAMPLE_INPUT = JSON.stringify({
   id: 'Collection-1-1',
 }, null, 2)
 
-function toIsoWithOffset(date) {
-  const pad = n => String(n).padStart(2, '0')
+function toIsoWithOffset(date: Date) {
+  const pad = (n: number) => String(n).padStart(2, '0')
   const offsetMinutes = -date.getTimezoneOffset()
   const sign = offsetMinutes >= 0 ? '+' : '-'
   const absOffset = Math.abs(offsetMinutes)
@@ -41,8 +74,8 @@ function toIsoWithOffset(date) {
   )
 }
 
-function dateOnly(date) {
-  const pad = n => String(n).padStart(2, '0')
+function dateOnly(date: Date) {
+  const pad = (n: number) => String(n).padStart(2, '0')
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
 }
 
@@ -70,7 +103,7 @@ export default function CollectionItem2ResubmissionItem() {
       return
     }
     try {
-      const data = JSON.parse(input)
+      const data = JSON.parse(input) as CollectionInput
       const now = new Date()
       const result = {
         Sequence: seq,
@@ -97,35 +130,35 @@ export default function CollectionItem2ResubmissionItem() {
       }
       setOutput(JSON.stringify(result, null, 4))
     } catch (e) {
-      setError('Invalid JSON: ' + e.message)
+      setError('Invalid JSON: ' + (e as Error).message)
     }
   }
 
   return (
     <div>
-      <div className="tool-grid-2">
+      <div className={toolGrid2}>
         {/* Input */}
-        <div className="card">
-          <div className="card-title">
-            <span className="card-title-dot" />
+        <div className={card}>
+          <div className={cardTitle}>
+            <span className={cardTitleDot} />
             Input Collection JSON
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 12, marginBottom: 16 }}>
-            <div className="form-field" style={{ marginBottom: 0 }}>
-              <label className="form-label">Email (CreatedBy / ModifiedBy)</label>
+            <div className={formField} style={{ marginBottom: 0 }}>
+              <label className={formLabel}>Email (CreatedBy / ModifiedBy)</label>
               <input
-                className="form-input"
+                className={formInput}
                 type="email"
                 placeholder="you@company.ie"
                 value={email}
                 onChange={e => setEmail(e.target.value)}
               />
             </div>
-            <div className="form-field" style={{ marginBottom: 0 }}>
-              <label className="form-label">Sequence</label>
+            <div className={formField} style={{ marginBottom: 0 }}>
+              <label className={formLabel}>Sequence</label>
               <input
-                className="form-input"
+                className={formInput}
                 type="number"
                 min="1"
                 step="1"
@@ -137,35 +170,35 @@ export default function CollectionItem2ResubmissionItem() {
             </div>
           </div>
 
-          <div className="code-area-wrap">
+          <div className={codeAreaWrap}>
             <textarea
-              className="code-area code-area-tall"
+              className={cx(codeArea, codeAreaTall)}
               value={input}
               onChange={e => setInput(e.target.value)}
               placeholder="Paste the rejected collection JSON here..."
             />
           </div>
-          <div className="btn-row">
-            <button className="btn btn-primary" onClick={convert}>Convert →</button>
-            <button className="btn btn-ghost" onClick={() => { setInput(SAMPLE_INPUT); setError(''); setOutput('') }}>
+          <div className={btnRow}>
+            <button className={cx(btn, btnPrimary)} onClick={convert}>Convert →</button>
+            <button className={cx(btn, btnGhost)} onClick={() => { setInput(SAMPLE_INPUT); setError(''); setOutput('') }}>
               Load sample
             </button>
-            <button className="btn btn-ghost" onClick={() => { setInput(''); setOutput(''); setError('') }}>
+            <button className={cx(btn, btnGhost)} onClick={() => { setInput(''); setOutput(''); setError('') }}>
               Clear
             </button>
           </div>
-          {error && <div className="alert alert-error">{error}</div>}
+          {error && <div data-testid="alert-error" className={cx(alert, alertVariants.error)}>{error}</div>}
         </div>
 
         {/* Output */}
-        <div className="card">
-          <div className="card-title">
-            <span className="card-title-dot green" />
+        <div className={card}>
+          <div className={cardTitle}>
+            <span className={cardTitleDotGreen} />
             Resubmission Document
           </div>
-          <div className="code-area-wrap">
+          <div className={codeAreaWrap}>
             <textarea
-              className="code-area code-area-tall"
+              className={cx(codeArea, codeAreaTall)}
               value={output}
               readOnly
               placeholder="Resubmission JSON will appear here..."

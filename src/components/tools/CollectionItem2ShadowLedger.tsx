@@ -1,8 +1,65 @@
 import { useState } from 'react'
 import CopyButton from '../CopyButton'
 import RulesGrid from '../RulesGrid'
+import {
+  alert,
+  alertVariants,
+  badge,
+  badgeVariants,
+  btn,
+  btnGhost,
+  btnPrimary,
+  btnRow,
+  card,
+  cardTitle,
+  cardTitleDot,
+  cardTitleDotGreen,
+  codeArea,
+  codeAreaTall,
+  codeAreaWrap,
+  cx,
+  toolGrid2,
+} from '../../ui'
 
-const SAMPLE_COLLECTION = {
+type Status = 'ready' | 'success' | 'error'
+type RequestType = 'raise' | 'failed'
+
+interface PaymentMethod {
+  $type?: string
+  [key: string]: unknown
+}
+
+interface CollectionItemInput {
+  CollectionId: string
+  PolicyNumber: string
+  RiskCode: string
+  RiskMajorVersion: number
+  ValueDate: string
+  RiskId: number
+  TransactionReference: string
+  CollectionStatus: string
+  PaymentScheduleItemIds: string[]
+  PaymentMethod?: PaymentMethod
+  ProviderDetails?: { ProcessingDate?: string; [key: string]: unknown }
+  id?: string
+}
+
+interface ShadowLedgerRequest {
+  policyNumber: string
+  riskCode: string
+  riskMajorVersion: number
+  valueDate: string | null
+  riskId: number
+  paymentScheduleId: string
+  transactionReference: string
+  isDirectDebitPayment: boolean
+  collectionItemId: string
+  paymentScheduleItemIds: string[]
+  transactionDate?: string
+  reportedDate?: string | null
+}
+
+const SAMPLE_COLLECTION: CollectionItemInput & Record<string, unknown> = {
   BatchId: '00000000-0000-0000-0000-000000000000',
   CollectionId: '356257f5-8dfe-468f-849f-93d9a3d2422f',
   PaymentScheduleItemIds: [
@@ -49,20 +106,20 @@ const SAMPLE_COLLECTION = {
   SourceSystem: 'PolicyAdmin',
 }
 
-function formatDate(dateString) {
+function formatDate(dateString?: string | null): string | null {
   if (!dateString) return null
   if (dateString.includes('T')) return dateString.split('T')[0]
   return dateString
 }
 
-function formatDateTime(dateString) {
-  if (!dateString) return null
+function formatDateTime(dateString: string): string {
+  if (!dateString) return ''
   const d = new Date(dateString)
   if (isNaN(d.getTime())) throw new Error(`Invalid date: ${dateString}`)
   return d.toISOString()
 }
 
-function determineRequestType(collectionStatus) {
+function determineRequestType(collectionStatus: string): RequestType {
   const raiseStatuses = ['created', 'refunded', 'collected']
   const failedStatuses = ['rejected']
   const norm = collectionStatus?.trim().toLowerCase()
@@ -71,13 +128,13 @@ function determineRequestType(collectionStatus) {
   throw new Error(`Unknown CollectionStatus: "${collectionStatus}". Expected one of: Created, Refunded, Collected, Rejected`)
 }
 
-function determineDirectDebitFlag(paymentMethod) {
+function determineDirectDebitFlag(paymentMethod?: PaymentMethod): boolean {
   if (!paymentMethod || !paymentMethod['$type']) return true
   return paymentMethod['$type'] !== 'CardPaymentMethodDocument'
 }
 
-function convertCollectionItem(item) {
-  const required = ['CollectionId', 'PolicyNumber', 'RiskCode', 'RiskMajorVersion', 'ValueDate', 'RiskId', 'TransactionReference', 'CollectionStatus', 'PaymentScheduleItemIds']
+function convertCollectionItem(item: CollectionItemInput): { request: ShadowLedgerRequest; type: RequestType } {
+  const required: (keyof CollectionItemInput)[] = ['CollectionId', 'PolicyNumber', 'RiskCode', 'RiskMajorVersion', 'ValueDate', 'RiskId', 'TransactionReference', 'CollectionStatus', 'PaymentScheduleItemIds']
   for (const f of required) {
     if (item[f] === undefined || item[f] === null) throw new Error(`Missing required field: ${f}`)
   }
@@ -87,7 +144,7 @@ function convertCollectionItem(item) {
   const processingDate = item.ProviderDetails?.ProcessingDate
   if (!processingDate) throw new Error('Missing ProviderDetails.ProcessingDate field')
 
-  const base = {
+  const base: ShadowLedgerRequest = {
     policyNumber: item.PolicyNumber,
     riskCode: item.RiskCode,
     riskMajorVersion: item.RiskMajorVersion,
@@ -112,7 +169,7 @@ function convertCollectionItem(item) {
 export default function CollectionItem2ShadowLedger() {
   const [input, setInput] = useState('')
   const [output, setOutput] = useState('')
-  const [status, setStatus] = useState('ready')
+  const [status, setStatus] = useState<Status>('ready')
   const [reqType, setReqType] = useState('')
   const [error, setError] = useState('')
 
@@ -126,66 +183,66 @@ export default function CollectionItem2ShadowLedger() {
       return
     }
     try {
-      const item = JSON.parse(input)
+      const item = JSON.parse(input) as CollectionItemInput
       const result = convertCollectionItem(item)
       setOutput(JSON.stringify(result.request, null, 2))
       setReqType(result.type.toUpperCase())
       setStatus('success')
     } catch (e) {
-      setError(e.message)
+      setError((e as Error).message)
       setStatus('error')
     }
   }
 
-  const statusClass = { ready: 'badge-ready', success: 'badge-success', error: 'badge-error' }[status]
+  const statusVariant = badgeVariants[status]
   const statusLabel = { ready: 'Ready', success: 'Converted', error: 'Error' }[status]
 
   return (
     <div>
-      <div className="tool-grid-2">
+      <div className={toolGrid2}>
         {/* Input */}
-        <div className="card">
-          <div className="card-title">
-            <span className="card-title-dot" />
+        <div className={card}>
+          <div className={cardTitle}>
+            <span className={cardTitleDot} />
             Input Collection Item JSON
           </div>
-          <div className="code-area-wrap">
+          <div className={codeAreaWrap}>
             <textarea
-              className="code-area code-area-tall"
+              className={cx(codeArea, codeAreaTall)}
               value={input}
               onChange={e => { setInput(e.target.value); setError(''); setStatus('ready') }}
               placeholder="Paste a Collection Item document here..."
             />
           </div>
-          <div className="btn-row">
-            <button className="btn btn-primary" onClick={handleConvert}>Convert →</button>
-            <button className="btn btn-ghost" onClick={() => { setInput(JSON.stringify(SAMPLE_COLLECTION, null, 2)); setError(''); setOutput(''); setStatus('ready'); setReqType('') }}>
+          <div className={btnRow}>
+            <button className={cx(btn, btnPrimary)} onClick={handleConvert}>Convert →</button>
+            <button className={cx(btn, btnGhost)} onClick={() => { setInput(JSON.stringify(SAMPLE_COLLECTION, null, 2)); setError(''); setOutput(''); setStatus('ready'); setReqType('') }}>
               Load sample
             </button>
-            <button className="btn btn-ghost" onClick={() => { setInput(''); setOutput(''); setError(''); setStatus('ready'); setReqType('') }}>
+            <button className={cx(btn, btnGhost)} onClick={() => { setInput(''); setOutput(''); setError(''); setStatus('ready'); setReqType('') }}>
               Clear
             </button>
           </div>
-          {error && <div className="alert alert-error">{error}</div>}
+          {error && <div data-testid="alert-error" className={cx(alert, alertVariants.error)}>{error}</div>}
         </div>
 
         {/* Output */}
-        <div className="card">
+        <div className={card}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
-            <div className="card-title" style={{ margin: 0 }}>
-              <span className="card-title-dot green" />
+            <div className={cx(cardTitle, 'mb-0')}>
+              <span className={cardTitleDotGreen} />
               Shadow Ledger Request
             </div>
-            <span className={`badge ${statusClass}`}>{statusLabel}</span>
+            <span className={cx(badge, statusVariant)}>{statusLabel}</span>
             {reqType && (
-              <span className={`badge ${reqType === 'RAISE' ? 'badge-raise' : 'badge-failed'}`}>
+              <span className={cx(badge, reqType === 'RAISE' ? badgeVariants.raise : badgeVariants.failed)}>
                 {reqType}
               </span>
             )}
           </div>
-          <div className="code-area-wrap">
+          <div className={codeAreaWrap}>
             <textarea
-              className="code-area code-area-tall"
+              className={cx(codeArea, codeAreaTall)}
               value={output}
               readOnly
               placeholder="Shadow Ledger request will appear here..."
