@@ -6,10 +6,13 @@ import {
   btn,
   btnGhost,
   btnDanger,
+  btnPrimary,
   card,
   cardTitle,
   cardTitleDot,
   cardTitleDotGreen,
+  codeArea,
+  codeAreaSm,
   cx,
   fileList,
   fileMeta,
@@ -19,6 +22,7 @@ import {
   fileRowActive,
   fileRowError,
   formInput,
+  formLabel,
   formSelect,
   pmtInfCard,
   pmtInfCardHead,
@@ -407,7 +411,10 @@ export default function SepaFileVisualizer() {
     return active.transactions.filter(t => {
       if (seqFilter !== 'all' && t.seqTp !== seqFilter) return false
       if (groupFilter !== 'all' && t.pmtInfId !== groupFilter) return false
-      if (term && !JSON.stringify(t).toLowerCase().includes(term)) return false
+      if (term) {
+        const haystack = columns.map(c => toSafeString(t[c.key])).join(' ').toLowerCase()
+        if (!haystack.includes(term)) return false
+      }
       return true
     })
   }, [active, search, seqFilter, groupFilter])
@@ -469,10 +476,10 @@ export default function SepaFileVisualizer() {
         <div className="h-px bg-border my-[22px]" />
 
         <div className="mb-4 last:mb-0">
-          <label className="block text-[0.78rem] font-bold text-text-muted mb-[7px] tracking-[0.03em]">Or paste raw XML</label>
+          <label className={formLabel}>Or paste raw XML</label>
           <div className="relative">
             <textarea
-              className="w-full min-h-[120px] p-3.5 bg-code-bg border border-code-border rounded-sm text-code-text font-mono text-[0.8rem] leading-[1.6] resize-y outline-none transition-[border-color,box-shadow] duration-[180ms] placeholder:text-text-faint focus:border-purple-border focus:shadow-[0_0_0_3px_var(--color-purple-dim)] focus:bg-white"
+              className={cx(codeArea, codeAreaSm)}
               value={pasteText}
               onChange={e => { setPasteText(e.target.value); setGlobalError('') }}
               placeholder="Paste a pain.008 or pain.001 XML document here..."
@@ -480,7 +487,7 @@ export default function SepaFileVisualizer() {
           </div>
         </div>
         <div className={btnRow}>
-          <button className={cx(btn, 'bg-purple text-white shadow-purple hover:bg-purple-dark hover:-translate-y-px hover:shadow-purple-lg active:translate-y-0')} onClick={handlePasteAdd}>Parse &amp; add →</button>
+          <button className={cx(btn, btnPrimary)} onClick={handlePasteAdd}>Parse &amp; add →</button>
         </div>
 
         {globalError && <div data-testid="alert-error" className={cx(alert, alertVariants.error)}>{globalError}</div>}
