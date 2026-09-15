@@ -12,7 +12,7 @@ import {
 import CollectionItem2ResubmissionItem from './components/tools/CollectionItem2ResubmissionItem'
 import CollectionItem2ShadowLedger from './components/tools/CollectionItem2ShadowLedger'
 import UpdateCollectionStatus from './components/tools/UpdateCollectionStatus'
-import Json2SepaPain008 from './components/tools/Json2SepaPain008'
+import SepaXmlGenerator from './components/tools/SepaXmlGenerator'
 import PaymentSchedule2Refund from './components/tools/PaymentSchedule2Refund'
 import ShadowLedgerReconciliation from './components/tools/ShadowLedgerReconciliation'
 import ShadowLedgerVisualizer from './components/tools/ShadowLedgerVisualizer'
@@ -76,8 +76,8 @@ const TOOLS: Tool[] = [
     id: 'sepa',
     label: 'SEPA XML',
     icon: Zap,
-    component: Json2SepaPain008,
-    desc: 'Convert Direct Debit JSON to SEPA pain.008.001.08 XML',
+    component: SepaXmlGenerator,
+    desc: 'Generate SEPA pain.008 (Direct Debit) XML from JSON, or pain.001 (Credit Transfer) XML from a CSV of payees',
   },
   {
     id: 'refund',

@@ -28,12 +28,12 @@ import {
   theadRow,
   toolGrid2,
 } from '../../ui'
+import { parseCsv, type CsvRow } from '../../lib/csv'
 
 const RAW_REQUIRED_HEADERS = ['Dimension', 'Amount', 'GlEntry', 'BatchId']
 const JOURNAL_REQUIRED_HEADERS = ['ACCOUNTDISPLAYVALUE', 'ACCOUNTTYPE', 'DEBITAMOUNT', 'CREDITAMOUNT', 'DESCRIPTION']
 const TOLERANCE = 0.01
 
-type CsvRow = Record<string, string>
 type ReconStatus = 'match' | 'mismatch' | 'raw-only' | 'journal-only'
 
 interface RawSummary {
@@ -72,50 +72,6 @@ interface ReconResult {
 }
 
 function round2(n: number): number { return Math.round((n + Number.EPSILON) * 100) / 100 }
-
-// Splits raw CSV text into rows of raw (untrimmed) field arrays, honoring
-// RFC4180 quoting (quoted fields may contain commas/quotes/newlines).
-function tokenizeCsv(text: string): string[][] {
-  const rows: string[][] = []
-  let row: string[] = []
-  let field = ''
-  let inQuotes = false
-  const pushField = () => { row.push(field); field = '' }
-  const pushRow = () => { pushField(); rows.push(row); row = [] }
-
-  for (let i = 0; i < text.length; i++) {
-    const c = text[i]
-    if (inQuotes) {
-      if (c !== '"') { field += c; continue }
-      if (text[i + 1] === '"') { field += '"'; i++ } else { inQuotes = false }
-      continue
-    }
-    if (c === '"') inQuotes = true
-    else if (c === ',') pushField()
-    else if (c === '\n') pushRow()
-    else if (c !== '\r') field += c // \r is ignored; \n handles the line break
-  }
-  if (field !== '' || row.length > 0) pushRow()
-  if (inQuotes) throw new Error('Malformed CSV: unterminated quoted field.')
-
-  return rows
-}
-
-function rowToObject(headers: string[], cols: string[]): CsvRow {
-  const obj: CsvRow = {}
-  headers.forEach((h, idx) => { obj[h] = (cols[idx] ?? '').trim() })
-  return obj
-}
-
-// Small RFC4180-aware CSV parser: handles quoted fields (with embedded commas/quotes).
-function parseCsv(text: string): { headers: string[]; rows: CsvRow[] } {
-  const rows = tokenizeCsv(text).filter(r => !(r.length === 1 && r[0] === ''))
-  if (rows.length === 0) return { headers: [], rows: [] }
-
-  const headers = rows[0].map(h => h.trim())
-  const dataRows = rows.slice(1).map(cols => rowToObject(headers, cols))
-  return { headers, rows: dataRows }
-}
 
 function buildRawSummary(rows: CsvRow[]): RawSummary {
   const byDim = new Map<string, { debit: number; credit: number }>()

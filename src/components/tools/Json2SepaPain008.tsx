@@ -25,6 +25,7 @@ import {
   formSelect,
   toolGrid2,
 } from '../../ui'
+import { addDays, cleanIban, downloadTextFile, formatDateTime, generateMessageId } from '../../lib/sepa'
 
 const STORAGE_KEY = 'sepaConverterFields'
 
@@ -66,24 +67,9 @@ function formatDate(s?: string): string {
   try { return new Date(s).toISOString().split('T')[0] } catch { return s }
 }
 
-function formatDateTime(d: Date | null = null): string {
-  return (d || new Date()).toISOString().replace(/\.\d{3}Z$/, '')
-}
-
-function generateMessageId(type = 'NORMAL'): string {
-  const now = new Date()
-  const dateStr = now.toISOString().split('T')[0].replace(/-/g, '')
-  const timeStr = now.toTimeString().split(' ')[0].replace(/:/g, '')
-  return `${dateStr}-${timeStr}-${type}-PAIN008`
-}
-
+// Direct debits need at least D+1 lead time; default to D+2 to be safe.
 function getDefaultCollectionDate(): string {
-  const d = new Date(); d.setDate(d.getDate() + 2)
-  return d.toISOString().split('T')[0]
-}
-
-function cleanIban(iban?: string): string {
-  return iban ? iban.trim().replace(/\s+/g, '') : ''
+  return addDays(2)
 }
 
 function readSavedFields(): SavedFields | null {
@@ -137,7 +123,7 @@ export default function Json2SepaPain008() {
       const missing = required.filter(f => !data[f])
       if (missing.length) throw new Error(`Missing required fields: ${missing.join(', ')}`)
 
-      const msgId = generateMessageId(transactionType)
+      const msgId = generateMessageId(transactionType, 'PAIN008')
       msgIdRef.current = msgId
       const seqType = data.IsFirstDirectDebit ? 'FRST' : 'RCUR'
       const createdDT = formatDateTime()
@@ -248,11 +234,7 @@ export default function Json2SepaPain008() {
   function handleDownload() {
     if (!xmlOutput) return
     const filename = msgIdRef.current ? `${msgIdRef.current}.xml` : 'sepa-payment.xml'
-    const blob = new Blob([xmlOutput], { type: 'application/xml' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a'); a.href = url; a.download = filename
-    document.body.appendChild(a); a.click(); document.body.removeChild(a)
-    URL.revokeObjectURL(url)
+    downloadTextFile(filename, xmlOutput, 'application/xml')
     setDownloaded(true); setTimeout(() => setDownloaded(false), 2000)
   }
 

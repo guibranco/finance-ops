@@ -9,7 +9,7 @@ An internal **Vite + React** toolbox that bundles a handful of small, focused co
 - **↻ Resubmission:** Transform rejected collection items into resubmission documents.
 - **⊞ Shadow Ledger:** Convert Collection Items into Shadow Ledger requests.
 - **⇄ Process Collection:** Generate historic and new collection documents for any target status.
-- **⌁ SEPA XML:** Convert Direct Debit JSON into SEPA `pain.008.001.08` XML.
+- **⌁ SEPA XML:** Two generators behind one tab — **Direct Debit** converts the collection JSON into SEPA `pain.008.001.08` XML; **Credit Transfer** turns a CSV of payees (reference, name, IBAN, amount) plus the origin account into SEPA `pain.001.001.09` XML, with column auto-mapping, IBAN/amount validation and a preview before generating.
 - **↩ Refund Schedule:** Generate refund schedule items and collection documents from a payment schedule.
 
 Each tool lives in its own tab, works entirely in the browser, and expects no backend connection.
@@ -80,7 +80,9 @@ finance-ops/
 ├── src/
 │   ├── components/
 │   │   └── tools/       # CollectionItem2ResubmissionItem, CollectionItem2ShadowLedger,
-│   │                     # UpdateCollectionStatus, Json2SepaPain008, PaymentSchedule2Refund, ...
+│   │                     # UpdateCollectionStatus, SepaXmlGenerator (Json2SepaPain008 +
+│   │                     # Csv2SepaPain001), PaymentSchedule2Refund, ...
+│   ├── lib/               # Shared parsing helpers (csv.ts, sepa.ts)
 │   ├── ui.ts              # Shared Tailwind utility-class constants
 │   ├── App.tsx            # Tab navigation + tool registry
 │   ├── index.css          # Tailwind v4 theme (design tokens)

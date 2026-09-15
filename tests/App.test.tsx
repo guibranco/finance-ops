@@ -80,7 +80,15 @@ describe('App', () => {
   it('displays the tool description subtitle on switch', () => {
     render(<App />)
     fireEvent.click(within(getNav()).getByText('SEPA XML'))
-    expect(screen.getByText(/convert direct debit json to sepa/i)).toBeInTheDocument()
+    expect(screen.getByText(/pain\.008 \(direct debit\) xml from json/i)).toBeInTheDocument()
+  })
+
+  it('shows the Direct Debit and Credit Transfer generators under the SEPA XML tab', () => {
+    render(<App />)
+    fireEvent.click(within(getNav()).getByText('SEPA XML'))
+    expect(screen.getByRole('tab', { name: /direct debit/i })).toHaveAttribute('aria-selected', 'true')
+    fireEvent.click(screen.getByRole('tab', { name: /credit transfer/i }))
+    expect(screen.getByPlaceholderText(/refund \/ payment csv/i)).toBeInTheDocument()
   })
 
   // ── Tab persistence ────────────────────────────────────────────────────

@@ -42,6 +42,15 @@ export const toolHeaderDesc = 'text-[0.88rem] text-text-muted';
 
 export const toolGrid2 = 'grid grid-cols-2 gap-5 max-tool:grid-cols-1';
 
+// Segmented mode switch shown above a tool that has more than one flavour
+// (e.g. SEPA XML → Direct Debit / Credit Transfer).
+export const segmented = 'inline-flex gap-1 p-1 bg-bg border border-border rounded-md mb-5 max-tool:w-full';
+export const segmentedBtn =
+  'inline-flex items-center gap-2 px-4 py-2 rounded-sm border border-transparent bg-transparent text-text-muted font-ui text-[0.82rem] font-semibold cursor-pointer transition-colors max-tool:flex-1 max-tool:justify-center';
+export const segmentedBtnInactive = 'hover:text-purple hover:bg-purple-dim';
+export const segmentedBtnActive = 'bg-white text-purple border-purple-border shadow-xs';
+export const segmentedHint = 'font-mono text-[0.68rem] font-normal text-text-faint';
+
 export const card =
   'bg-white border border-border rounded-lg p-[22px] shadow-md transition-[border-color,box-shadow] duration-[180ms] focus-within:border-purple-border focus-within:shadow-lg';
 
