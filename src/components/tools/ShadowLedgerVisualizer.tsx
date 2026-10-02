@@ -69,24 +69,57 @@ interface Stats {
   batches: number;
 }
 
+// Built-in sample: a Refund and its RefundWriteOff for one policy. Each row holds only
+// the fields that vary; everything else is shared by every entry.
+type SampleRow = [
+  id: number,
+  amount: number,
+  categoryCode: string,
+  amountComponent: string,
+  glChartCode: string,
+  glEntry: string,
+  operation: string,
+  createdTime: string,
+];
+
+// prettier-ignore
+const SAMPLE_ROWS: SampleRow[] = [
+  [1269403, -6.93, "", "Premium", "133206", "Credit", "Refund", "22:03:30.3961529"],
+  [1269404, -5.82, "", "PremiumNet", "410101", "Debit", "Refund", "22:03:30.3961629"],
+  [1269405, -0.18, "LVY", "TaxOrLevy", "310916", "Debit", "Refund", "22:03:30.3961689"],
+  [1269406, -0.93, "ICF", "TaxOrLevy", "310916", "Debit", "Refund", "22:03:30.39617"],
+  [1270538, 6.93, "", "Premium", "133206", "Debit", "RefundWriteOff", "22:04:54.8347902"],
+  [1270539, 5.82, "", "PremiumNet", "410101", "Credit", "RefundWriteOff", "22:04:54.8347989"],
+  [1270540, 0.18, "LVY", "TaxOrLevy", "310916", "Credit", "RefundWriteOff", "22:04:54.8348053"],
+  [1270541, 0.93, "ICF", "TaxOrLevy", "310916", "Credit", "RefundWriteOff", "22:04:54.8348065"],
+];
+
 const SAMPLE_PAYLOAD: EntriesPayload = {
-  entries: [
-    {
-      id: 1269403,
+  entries: SAMPLE_ROWS.map(
+    ([
+      id,
+      amount,
+      categoryCode,
+      amountComponent,
+      glChartCode,
+      glEntry,
+      operation,
+      createdTime,
+    ]) => ({
+      id,
       policyNumber: "OUT00275391",
       riskId: 1,
       riskCode: "VEH",
       valueDate: "2026-06-16T00:00:00",
       transactionDate: "2026-06-16T00:00:00",
-      amount: -6.93,
-      categoryCode: "",
-      amountComponent: "Premium",
-      glChartCode: "133206",
-      dimension:
-        "133206-STI_000_F-VEH-CCU------STI-000-F-MOT-PER-PES-CAL-DIR---",
-      glEntry: "Credit",
-      operation: "Refund",
-      createdDate: "2026-06-16T22:03:30.3961529+00:00",
+      amount,
+      categoryCode,
+      amountComponent,
+      glChartCode,
+      dimension: `${glChartCode}-STI_000_F-VEH-CCU------STI-000-F-MOT-PER-PES-CAL-DIR---`,
+      glEntry,
+      operation,
+      createdDate: `2026-06-16T${createdTime}+00:00`,
       batchId: "BATCH-DEBTORS-021FD-20260617-010023-2101",
       transactionReference: "OUT00275391-1-3-VEH-3",
       paymentMethod: "Card",
@@ -105,253 +138,8 @@ const SAMPLE_PAYLOAD: EntriesPayload = {
       riskMajorVersion: 3,
       paymentScheduleId: "948dfaab-e5b5-4b7c-8c52-e0a035cf14e6",
       paymentScheduleItemId: "8baaad39-7d3b-42b0-9478-7aec6fa0ead2",
-    },
-    {
-      id: 1269404,
-      policyNumber: "OUT00275391",
-      riskId: 1,
-      riskCode: "VEH",
-      valueDate: "2026-06-16T00:00:00",
-      transactionDate: "2026-06-16T00:00:00",
-      amount: -5.82,
-      categoryCode: "",
-      amountComponent: "PremiumNet",
-      glChartCode: "410101",
-      dimension:
-        "410101-STI_000_F-VEH-CCU------STI-000-F-MOT-PER-PES-CAL-DIR---",
-      glEntry: "Debit",
-      operation: "Refund",
-      createdDate: "2026-06-16T22:03:30.3961629+00:00",
-      batchId: "BATCH-DEBTORS-021FD-20260617-010023-2101",
-      transactionReference: "OUT00275391-1-3-VEH-3",
-      paymentMethod: "Card",
-      providerFilename: null,
-      salesSource: "CCU",
-      costCentreL1: "STI",
-      costCentreL2: "000",
-      costCentreL3: "F",
-      product: "MOT",
-      productGroup: "PER",
-      reportingSegment: "PES",
-      salesChannel: "CAL",
-      distributionChannel: "DIR",
-      companyCode: "2101",
-      collectionItemId: "Collection-1-3",
-      riskMajorVersion: 3,
-      paymentScheduleId: "948dfaab-e5b5-4b7c-8c52-e0a035cf14e6",
-      paymentScheduleItemId: "8baaad39-7d3b-42b0-9478-7aec6fa0ead2",
-    },
-    {
-      id: 1269405,
-      policyNumber: "OUT00275391",
-      riskId: 1,
-      riskCode: "VEH",
-      valueDate: "2026-06-16T00:00:00",
-      transactionDate: "2026-06-16T00:00:00",
-      amount: -0.18,
-      categoryCode: "LVY",
-      amountComponent: "TaxOrLevy",
-      glChartCode: "310916",
-      dimension:
-        "310916-STI_000_F-VEH-CCU------STI-000-F-MOT-PER-PES-CAL-DIR---",
-      glEntry: "Debit",
-      operation: "Refund",
-      createdDate: "2026-06-16T22:03:30.3961689+00:00",
-      batchId: "BATCH-DEBTORS-021FD-20260617-010023-2101",
-      transactionReference: "OUT00275391-1-3-VEH-3",
-      paymentMethod: "Card",
-      providerFilename: null,
-      salesSource: "CCU",
-      costCentreL1: "STI",
-      costCentreL2: "000",
-      costCentreL3: "F",
-      product: "MOT",
-      productGroup: "PER",
-      reportingSegment: "PES",
-      salesChannel: "CAL",
-      distributionChannel: "DIR",
-      companyCode: "2101",
-      collectionItemId: "Collection-1-3",
-      riskMajorVersion: 3,
-      paymentScheduleId: "948dfaab-e5b5-4b7c-8c52-e0a035cf14e6",
-      paymentScheduleItemId: "8baaad39-7d3b-42b0-9478-7aec6fa0ead2",
-    },
-    {
-      id: 1269406,
-      policyNumber: "OUT00275391",
-      riskId: 1,
-      riskCode: "VEH",
-      valueDate: "2026-06-16T00:00:00",
-      transactionDate: "2026-06-16T00:00:00",
-      amount: -0.93,
-      categoryCode: "ICF",
-      amountComponent: "TaxOrLevy",
-      glChartCode: "310916",
-      dimension:
-        "310916-STI_000_F-VEH-CCU------STI-000-F-MOT-PER-PES-CAL-DIR---",
-      glEntry: "Debit",
-      operation: "Refund",
-      createdDate: "2026-06-16T22:03:30.39617+00:00",
-      batchId: "BATCH-DEBTORS-021FD-20260617-010023-2101",
-      transactionReference: "OUT00275391-1-3-VEH-3",
-      paymentMethod: "Card",
-      providerFilename: null,
-      salesSource: "CCU",
-      costCentreL1: "STI",
-      costCentreL2: "000",
-      costCentreL3: "F",
-      product: "MOT",
-      productGroup: "PER",
-      reportingSegment: "PES",
-      salesChannel: "CAL",
-      distributionChannel: "DIR",
-      companyCode: "2101",
-      collectionItemId: "Collection-1-3",
-      riskMajorVersion: 3,
-      paymentScheduleId: "948dfaab-e5b5-4b7c-8c52-e0a035cf14e6",
-      paymentScheduleItemId: "8baaad39-7d3b-42b0-9478-7aec6fa0ead2",
-    },
-    {
-      id: 1270538,
-      policyNumber: "OUT00275391",
-      riskId: 1,
-      riskCode: "VEH",
-      valueDate: "2026-06-16T00:00:00",
-      transactionDate: "2026-06-16T00:00:00",
-      amount: 6.93,
-      categoryCode: "",
-      amountComponent: "Premium",
-      glChartCode: "133206",
-      dimension:
-        "133206-STI_000_F-VEH-CCU------STI-000-F-MOT-PER-PES-CAL-DIR---",
-      glEntry: "Debit",
-      operation: "RefundWriteOff",
-      createdDate: "2026-06-16T22:04:54.8347902+00:00",
-      batchId: "BATCH-DEBTORS-021FD-20260617-010023-2101",
-      transactionReference: "OUT00275391-1-3-VEH-3",
-      paymentMethod: "Card",
-      providerFilename: null,
-      salesSource: "CCU",
-      costCentreL1: "STI",
-      costCentreL2: "000",
-      costCentreL3: "F",
-      product: "MOT",
-      productGroup: "PER",
-      reportingSegment: "PES",
-      salesChannel: "CAL",
-      distributionChannel: "DIR",
-      companyCode: "2101",
-      collectionItemId: "Collection-1-3",
-      riskMajorVersion: 3,
-      paymentScheduleId: "948dfaab-e5b5-4b7c-8c52-e0a035cf14e6",
-      paymentScheduleItemId: "8baaad39-7d3b-42b0-9478-7aec6fa0ead2",
-    },
-    {
-      id: 1270539,
-      policyNumber: "OUT00275391",
-      riskId: 1,
-      riskCode: "VEH",
-      valueDate: "2026-06-16T00:00:00",
-      transactionDate: "2026-06-16T00:00:00",
-      amount: 5.82,
-      categoryCode: "",
-      amountComponent: "PremiumNet",
-      glChartCode: "410101",
-      dimension:
-        "410101-STI_000_F-VEH-CCU------STI-000-F-MOT-PER-PES-CAL-DIR---",
-      glEntry: "Credit",
-      operation: "RefundWriteOff",
-      createdDate: "2026-06-16T22:04:54.8347989+00:00",
-      batchId: "BATCH-DEBTORS-021FD-20260617-010023-2101",
-      transactionReference: "OUT00275391-1-3-VEH-3",
-      paymentMethod: "Card",
-      providerFilename: null,
-      salesSource: "CCU",
-      costCentreL1: "STI",
-      costCentreL2: "000",
-      costCentreL3: "F",
-      product: "MOT",
-      productGroup: "PER",
-      reportingSegment: "PES",
-      salesChannel: "CAL",
-      distributionChannel: "DIR",
-      companyCode: "2101",
-      collectionItemId: "Collection-1-3",
-      riskMajorVersion: 3,
-      paymentScheduleId: "948dfaab-e5b5-4b7c-8c52-e0a035cf14e6",
-      paymentScheduleItemId: "8baaad39-7d3b-42b0-9478-7aec6fa0ead2",
-    },
-    {
-      id: 1270540,
-      policyNumber: "OUT00275391",
-      riskId: 1,
-      riskCode: "VEH",
-      valueDate: "2026-06-16T00:00:00",
-      transactionDate: "2026-06-16T00:00:00",
-      amount: 0.18,
-      categoryCode: "LVY",
-      amountComponent: "TaxOrLevy",
-      glChartCode: "310916",
-      dimension:
-        "310916-STI_000_F-VEH-CCU------STI-000-F-MOT-PER-PES-CAL-DIR---",
-      glEntry: "Credit",
-      operation: "RefundWriteOff",
-      createdDate: "2026-06-16T22:04:54.8348053+00:00",
-      batchId: "BATCH-DEBTORS-021FD-20260617-010023-2101",
-      transactionReference: "OUT00275391-1-3-VEH-3",
-      paymentMethod: "Card",
-      providerFilename: null,
-      salesSource: "CCU",
-      costCentreL1: "STI",
-      costCentreL2: "000",
-      costCentreL3: "F",
-      product: "MOT",
-      productGroup: "PER",
-      reportingSegment: "PES",
-      salesChannel: "CAL",
-      distributionChannel: "DIR",
-      companyCode: "2101",
-      collectionItemId: "Collection-1-3",
-      riskMajorVersion: 3,
-      paymentScheduleId: "948dfaab-e5b5-4b7c-8c52-e0a035cf14e6",
-      paymentScheduleItemId: "8baaad39-7d3b-42b0-9478-7aec6fa0ead2",
-    },
-    {
-      id: 1270541,
-      policyNumber: "OUT00275391",
-      riskId: 1,
-      riskCode: "VEH",
-      valueDate: "2026-06-16T00:00:00",
-      transactionDate: "2026-06-16T00:00:00",
-      amount: 0.93,
-      categoryCode: "ICF",
-      amountComponent: "TaxOrLevy",
-      glChartCode: "310916",
-      dimension:
-        "310916-STI_000_F-VEH-CCU------STI-000-F-MOT-PER-PES-CAL-DIR---",
-      glEntry: "Credit",
-      operation: "RefundWriteOff",
-      createdDate: "2026-06-16T22:04:54.8348065+00:00",
-      batchId: "BATCH-DEBTORS-021FD-20260617-010023-2101",
-      transactionReference: "OUT00275391-1-3-VEH-3",
-      paymentMethod: "Card",
-      providerFilename: null,
-      salesSource: "CCU",
-      costCentreL1: "STI",
-      costCentreL2: "000",
-      costCentreL3: "F",
-      product: "MOT",
-      productGroup: "PER",
-      reportingSegment: "PES",
-      salesChannel: "CAL",
-      distributionChannel: "DIR",
-      companyCode: "2101",
-      collectionItemId: "Collection-1-3",
-      riskMajorVersion: 3,
-      paymentScheduleId: "948dfaab-e5b5-4b7c-8c52-e0a035cf14e6",
-      paymentScheduleItemId: "8baaad39-7d3b-42b0-9478-7aec6fa0ead2",
-    },
-  ],
+    }),
+  ),
   isTruncated: false,
 };
 
@@ -477,7 +265,11 @@ function formatValue(key: string, value: unknown): string {
   }
   if (typeof value === "boolean") return value ? "true" : "false";
   if (Array.isArray(value)) return value.join(", ");
-  if (typeof value === "string" && /Date$/.test(key) && value.includes("T")) {
+  if (
+    typeof value === "string" &&
+    key.endsWith("Date") &&
+    value.includes("T")
+  ) {
     return key === "createdDate"
       ? value.replace(/\.\d+/, "").replace(/[+-]\d{2}:\d{2}$/, "")
       : value.split("T")[0];
@@ -561,7 +353,10 @@ function downloadCsv(filename: string, text: string) {
 }
 
 /** A single labelled figure in the summary row. */
-function StatTile({ label, value }: { label: string; value: string }) {
+function StatTile({
+  label,
+  value,
+}: Readonly<{ label: string; value: string }>) {
   return (
     <div className={statTile}>
       <div className={statTileLabel}>{label}</div>
@@ -571,7 +366,9 @@ function StatTile({ label, value }: { label: string; value: string }) {
 }
 
 /** Success alert when every posting balances, otherwise the list of unbalanced postings. */
-function BalanceAlert({ unbalanced }: { unbalanced: PostingBalance[] }) {
+function BalanceAlert({
+  unbalanced,
+}: Readonly<{ unbalanced: PostingBalance[] }>) {
   if (unbalanced.length === 0) {
     return (
       <div className={cx(alert, alertVariants.success)}>
@@ -601,10 +398,10 @@ function BalanceAlert({ unbalanced }: { unbalanced: PostingBalance[] }) {
 function EntryCell({
   entry,
   field,
-}: {
+}: Readonly<{
   entry: ShadowLedgerEntry;
   field: string;
-}) {
+}>) {
   if (field === "glEntry") {
     const dir = (entry.glEntry || "").toString().toLowerCase();
     const isDirection = dir === "debit" || dir === "credit";
@@ -646,7 +443,7 @@ function EntriesTable({
   sortKey,
   sortDir,
   onSort,
-}: EntriesTableProps) {
+}: Readonly<EntriesTableProps>) {
   return (
     <div className={vizTableWrap}>
       <table className={vizTable}>
@@ -710,9 +507,13 @@ export default function ShadowLedgerVisualizer() {
   const operations = useMemo(
     () =>
       result
-        ? ([
-            ...new Set(result.entries.map((e) => e.operation).filter(Boolean)),
-          ].sort() as string[])
+        ? [
+            ...new Set(
+              result.entries
+                .map((e) => e.operation)
+                .filter((op): op is string => Boolean(op)),
+            ),
+          ].sort((a, b) => a.localeCompare(b))
         : [],
     [result],
   );
@@ -789,7 +590,7 @@ export default function ShadowLedgerVisualizer() {
       visibleKeys
         .map((k) => {
           const cell = toSafeString(e[k]);
-          return `"${cell.replace(/"/g, '""')}"`;
+          return `"${cell.replaceAll('"', '""')}"`;
         })
         .join(","),
     );
@@ -941,7 +742,7 @@ export default function ShadowLedgerVisualizer() {
                   checked={showAllColumns}
                   onChange={(e) => setShowAllColumns(e.target.checked)}
                 />
-                Show all columns
+                <span>Show all columns</span>
               </label>
             </div>
 
