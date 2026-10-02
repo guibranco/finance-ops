@@ -428,6 +428,98 @@ function EntryCell({
   return <td className={vizTd}>{formatValue(field, entry[field])}</td>;
 }
 
+/** Summary tiles plus the per-posting balance result. */
+function SummaryCard({
+  stats,
+  unbalanced,
+}: Readonly<{ stats: Stats; unbalanced: PostingBalance[] }>) {
+  return (
+    <div className={card}>
+      <div className={cardTitle}>
+        <span
+          className={unbalanced.length === 0 ? cardTitleDotGreen : cardTitleDot}
+        />{" "}
+        Summary
+      </div>
+      <div className={statTileRow}>
+        <StatTile label="Entries" value={stats.count.toLocaleString()} />
+        <StatTile label="Net amount" value={stats.net.toLocaleString()} />
+        <StatTile label="Total debit" value={stats.debit.toLocaleString()} />
+        <StatTile label="Total credit" value={stats.credit.toLocaleString()} />
+        <StatTile label="Policies" value={stats.policies.toLocaleString()} />
+        <StatTile label="Batches" value={stats.batches.toLocaleString()} />
+      </div>
+      <BalanceAlert unbalanced={unbalanced} />
+    </div>
+  );
+}
+
+interface EntriesToolbarProps {
+  search: string;
+  onSearchChange: (value: string) => void;
+  glEntryFilter: string;
+  onGlEntryFilterChange: (value: string) => void;
+  operationFilter: string;
+  onOperationFilterChange: (value: string) => void;
+  operations: string[];
+  showAllColumns: boolean;
+  onShowAllColumnsChange: (value: boolean) => void;
+}
+
+/** Search box, GL-entry and operation filters, and the all-columns toggle. */
+function EntriesToolbar({
+  search,
+  onSearchChange,
+  glEntryFilter,
+  onGlEntryFilterChange,
+  operationFilter,
+  onOperationFilterChange,
+  operations,
+  showAllColumns,
+  onShowAllColumnsChange,
+}: Readonly<EntriesToolbarProps>) {
+  return (
+    <div className={vizToolbar}>
+      <input
+        type="text"
+        className={formInput}
+        placeholder="Search entries..."
+        value={search}
+        onChange={(e) => onSearchChange(e.target.value)}
+      />
+      <select
+        className={cx(formSelect, vizToolbarInput)}
+        value={glEntryFilter}
+        onChange={(e) => onGlEntryFilterChange(e.target.value)}
+      >
+        <option value="all">All GL entries</option>
+        <option value="debit">Debit</option>
+        <option value="credit">Credit</option>
+      </select>
+      <select
+        className={cx(formSelect, vizToolbarInput)}
+        value={operationFilter}
+        onChange={(e) => onOperationFilterChange(e.target.value)}
+      >
+        <option value="all">All operations</option>
+        {operations.map((op) => (
+          <option key={op} value={op}>
+            {op}
+          </option>
+        ))}
+      </select>
+      <label className="flex items-center gap-1.5 text-[0.8rem] text-text-muted cursor-pointer">
+        <input
+          type="checkbox"
+          checked={showAllColumns}
+          onChange={(e) => onShowAllColumnsChange(e.target.checked)}
+        />
+        <span>Show all columns</span>
+      </label>
+    </div>
+  );
+}
+
 interface EntriesTableProps {
   entries: ShadowLedgerEntry[];
   columns: string[];
@@ -701,7 +793,6 @@ export default function ShadowLedgerVisualizer() {
               </button>
             </div>
           </div>
-        </>
       )}
     </div>
   );
