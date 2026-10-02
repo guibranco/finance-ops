@@ -651,55 +651,18 @@ export default function ShadowLedgerVisualizer() {
         )}
       </div>
 
-      {result && stats && (
-        <>
-          {result.isTruncated && (
-            <div
-              className={cx(
-                alert,
-                alertVariants.warning,
-                "flex items-center gap-2",
-              )}
-            >
-              <AlertTriangle size={14} /> This result set is truncated — not all
-              matching entries were returned by the source query.
-            </div>
-          )}
+      {result?.isTruncated && (
+        <div
+          className={cx(alert, alertVariants.warning, "flex items-center gap-2")}
+        >
+          <AlertTriangle size={14} /> This result set is truncated — not all
+          matching entries were returned by the source query.
+        </div>
+      )}
 
-          <div className={card}>
-            <div className={cardTitle}>
-              <span
-                className={
-                  unbalancedPostings.length === 0
-                    ? cardTitleDotGreen
-                    : cardTitleDot
-                }
-              />{" "}
-              Summary
-            </div>
-            <div className={statTileRow}>
-              <StatTile label="Entries" value={stats.count.toLocaleString()} />
-              <StatTile label="Net amount" value={stats.net.toLocaleString()} />
-              <StatTile
-                label="Total debit"
-                value={stats.debit.toLocaleString()}
-              />
-              <StatTile
-                label="Total credit"
-                value={stats.credit.toLocaleString()}
-              />
-              <StatTile
-                label="Policies"
-                value={stats.policies.toLocaleString()}
-              />
-              <StatTile
-                label="Batches"
-                value={stats.batches.toLocaleString()}
-              />
-            </div>
-            <BalanceAlert unbalanced={unbalancedPostings} />
-          </div>
+      {stats && <SummaryCard stats={stats} unbalanced={unbalancedPostings} />}
 
+      {result && (
           <div className={card}>
             <div className={cardTitle}>
               <span className={cardTitleDot} /> Entries (
@@ -707,44 +670,17 @@ export default function ShadowLedgerVisualizer() {
               {result.entries.length.toLocaleString()})
             </div>
 
-            <div className={vizToolbar}>
-              <input
-                type="text"
-                className={formInput}
-                placeholder="Search entries..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
-              <select
-                className={cx(formSelect, vizToolbarInput)}
-                value={glEntryFilter}
-                onChange={(e) => setGlEntryFilter(e.target.value)}
-              >
-                <option value="all">All GL entries</option>
-                <option value="debit">Debit</option>
-                <option value="credit">Credit</option>
-              </select>
-              <select
-                className={cx(formSelect, vizToolbarInput)}
-                value={operationFilter}
-                onChange={(e) => setOperationFilter(e.target.value)}
-              >
-                <option value="all">All operations</option>
-                {operations.map((op) => (
-                  <option key={op} value={op}>
-                    {op}
-                  </option>
-                ))}
-              </select>
-              <label className="flex items-center gap-1.5 text-[0.8rem] text-text-muted cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={showAllColumns}
-                  onChange={(e) => setShowAllColumns(e.target.checked)}
-                />
-                <span>Show all columns</span>
-              </label>
-            </div>
+            <EntriesToolbar
+              search={search}
+              onSearchChange={setSearch}
+              glEntryFilter={glEntryFilter}
+              onGlEntryFilterChange={setGlEntryFilter}
+              operationFilter={operationFilter}
+              onOperationFilterChange={setOperationFilter}
+              operations={operations}
+              showAllColumns={showAllColumns}
+              onShowAllColumnsChange={setShowAllColumns}
+            />
 
             <EntriesTable
               entries={sortedEntries}
