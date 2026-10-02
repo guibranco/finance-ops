@@ -745,7 +745,11 @@ export default function ShadowLedgerVisualizer() {
 
       {result?.isTruncated && (
         <div
-          className={cx(alert, alertVariants.warning, "flex items-center gap-2")}
+          className={cx(
+            alert,
+            alertVariants.warning,
+            "flex items-center gap-2",
+          )}
         >
           <AlertTriangle size={14} /> This result set is truncated — not all
           matching entries were returned by the source query.
@@ -755,44 +759,44 @@ export default function ShadowLedgerVisualizer() {
       {stats && <SummaryCard stats={stats} unbalanced={unbalancedPostings} />}
 
       {result && (
-          <div className={card}>
-            <div className={cardTitle}>
-              <span className={cardTitleDot} /> Entries (
-              {sortedEntries.length.toLocaleString()} of{" "}
-              {result.entries.length.toLocaleString()})
-            </div>
-
-            <EntriesToolbar
-              search={search}
-              onSearchChange={setSearch}
-              glEntryFilter={glEntryFilter}
-              onGlEntryFilterChange={setGlEntryFilter}
-              operationFilter={operationFilter}
-              onOperationFilterChange={setOperationFilter}
-              operations={operations}
-              showAllColumns={showAllColumns}
-              onShowAllColumnsChange={setShowAllColumns}
-            />
-
-            <EntriesTable
-              entries={sortedEntries}
-              columns={visibleKeys}
-              sortKey={sortKey}
-              sortDir={sortDir}
-              onSort={handleSort}
-            />
-
-            <div className={btnRow}>
-              <button
-                type="button"
-                className={cx(btn, btnSecondary)}
-                onClick={handleDownload}
-              >
-                {downloaded ? <Check size={14} /> : <Download size={14} />}
-                {downloaded ? "Downloaded" : "Download visible columns as CSV"}
-              </button>
-            </div>
+        <div className={card}>
+          <div className={cardTitle}>
+            <span className={cardTitleDot} /> Entries (
+            {sortedEntries.length.toLocaleString()} of{" "}
+            {result.entries.length.toLocaleString()})
           </div>
+
+          <EntriesToolbar
+            search={search}
+            onSearchChange={setSearch}
+            glEntryFilter={glEntryFilter}
+            onGlEntryFilterChange={setGlEntryFilter}
+            operationFilter={operationFilter}
+            onOperationFilterChange={setOperationFilter}
+            operations={operations}
+            showAllColumns={showAllColumns}
+            onShowAllColumnsChange={setShowAllColumns}
+          />
+
+          <EntriesTable
+            entries={sortedEntries}
+            columns={visibleKeys}
+            sortKey={sortKey}
+            sortDir={sortDir}
+            onSort={handleSort}
+          />
+
+          <div className={btnRow}>
+            <button
+              type="button"
+              className={cx(btn, btnSecondary)}
+              onClick={handleDownload}
+            >
+              {downloaded ? <Check size={14} /> : <Download size={14} />}
+              {downloaded ? "Downloaded" : "Download visible columns as CSV"}
+            </button>
+          </div>
+        </div>
       )}
     </div>
   );
