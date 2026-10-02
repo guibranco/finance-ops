@@ -19,7 +19,21 @@ const UNBALANCED_ENTRIES = {
   isTruncated: true,
 }
 
-const visualize = (payload: unknown) => {
+// A single Collection: one debit on 133206, credits split across 410101/310916/310917.
+// Each GL dimension is one-sided, but the posting as a whole balances.
+const COLLECTION_ENTRIES = {
+  entries: [
+    { id: 1, transactionReference: 'REF-3', operation: 'Collection', amountComponent: 'Premium', glEntry: 'Debit', amount: 267.27, glChartCode: '133206', dimension: '133206-DIM' },
+    { id: 2, transactionReference: 'REF-3', operation: 'Collection', amountComponent: 'PremiumNet', glEntry: 'Credit', amount: 256.99, glChartCode: '410101', dimension: '410101-DIM' },
+    { id: 3, transactionReference: 'REF-3', operation: 'Collection', amountComponent: 'TaxOrLevy', glEntry: 'Credit', amount: 7.71, glChartCode: '310916', dimension: '310916-DIM' },
+    { id: 4, transactionReference: 'REF-3', operation: 'Collection', amountComponent: 'TaxOrLevy', glEntry: 'Credit', amount: 2.57, glChartCode: '310916', dimension: '310916-DIM' },
+    { id: 5, transactionReference: 'REF-3', operation: 'Collection', amountComponent: 'AdminFee', glEntry: 'Debit', amount: 1, glChartCode: '133206', dimension: '133206-DIM' },
+    { id: 6, transactionReference: 'REF-3', operation: 'Collection', amountComponent: 'AdminFeeNet', glEntry: 'Credit', amount: 1, glChartCode: '310917', dimension: '310917-DIM' },
+  ],
+  isTruncated: false,
+}
+
+const visualize =(payload: unknown) => {
   fireEvent.change(screen.getByPlaceholderText(/shadow ledger entries json payload/i), {
     target: { value: typeof payload === 'string' ? payload : JSON.stringify(payload) },
   })
@@ -64,17 +78,24 @@ describe('ShadowLedgerVisualizer', () => {
     expect(screen.getByText('10.00')).toBeInTheDocument()
   })
 
-  it('shows the balanced message when debit equals credit per dimension', () => {
+  it('shows the balanced message when debit equals credit per posting', () => {
     render(<ShadowLedgerVisualizer />)
     visualize(BALANCED_ENTRIES)
     expect(screen.getByText(/debit and credit totals balance/i)).toBeInTheDocument()
   })
 
-  it('flags an unbalanced dimension', () => {
+  it('treats a collection spread across several GL accounts as balanced', () => {
+    render(<ShadowLedgerVisualizer />)
+    visualize(COLLECTION_ENTRIES)
+    expect(screen.getByText(/debit and credit totals balance/i)).toBeInTheDocument()
+    expect(screen.queryByText(/out of balance/i)).not.toBeInTheDocument()
+  })
+
+  it('flags an unbalanced posting', () => {
     render(<ShadowLedgerVisualizer />)
     visualize(UNBALANCED_ENTRIES)
-    expect(screen.getByText(/dimension.*out of balance/i)).toBeInTheDocument()
-    expect(screen.getByText(/DIM-B — debit 10 vs credit 8/i)).toBeInTheDocument()
+    expect(screen.getByText(/posting.*out of balance/i)).toBeInTheDocument()
+    expect(screen.getByText(/REF-2 · Refund — debit 10 vs credit 8/i)).toBeInTheDocument()
   })
 
   it('shows a truncated-results warning when isTruncated is true', () => {

@@ -52,8 +52,8 @@ interface EntriesPayload {
   isTruncated: boolean
 }
 
-interface DimensionBalance {
-  dimension: string
+interface PostingBalance {
+  posting: string
   debit: number
   credit: number
   diff: number
@@ -210,21 +210,24 @@ function buildStats(entries: ShadowLedgerEntry[]): Stats {
   }
 }
 
-function buildDimensionBalance(entries: ShadowLedgerEntry[]): DimensionBalance[] {
-  const byDim = new Map<string, { debit: number; credit: number }>()
+// Double-entry balance is checked per posting (transaction reference + operation), not per
+// dimension: the dimension string is prefixed by the GL chart code, so each GL account is
+// naturally one-sided (e.g. a Collection debits 133206 and credits 410101/310916/310917).
+function buildPostingBalance(entries: ShadowLedgerEntry[]): PostingBalance[] {
+  const byPosting = new Map<string, { debit: number; credit: number }>()
   entries.forEach(e => {
-    const dim = e.dimension as string | undefined
     const dir = (e.glEntry || '').toString().toLowerCase()
-    if (!dim || (dir !== 'debit' && dir !== 'credit')) return
-    if (!byDim.has(dim)) byDim.set(dim, { debit: 0, credit: 0 })
-    byDim.get(dim)![dir] += Math.abs(Number(e.amount) || 0)
+    if (dir !== 'debit' && dir !== 'credit') return
+    const posting = `${toSafeString(e.transactionReference) || '(no reference)'} · ${e.operation || '(no operation)'}`
+    if (!byPosting.has(posting)) byPosting.set(posting, { debit: 0, credit: 0 })
+    byPosting.get(posting)![dir] += Math.abs(Number(e.amount) || 0)
   })
-  return [...byDim.entries()]
-    .map(([dimension, v]) => {
+  return [...byPosting.entries()]
+    .map(([posting, v]) => {
       const debit = round2(v.debit), credit = round2(v.credit)
-      return { dimension, debit, credit, diff: round2(debit - credit), balanced: Math.abs(debit - credit) <= 0.01 }
+      return { posting, debit, credit, diff: round2(debit - credit), balanced: Math.abs(debit - credit) <= 0.01 }
     })
-    .sort((a, b) => a.dimension.localeCompare(b.dimension))
+    .sort((a, b) => a.posting.localeCompare(b.posting))
 }
 
 function downloadCsv(filename: string, text: string) {
@@ -288,8 +291,8 @@ export default function ShadowLedgerVisualizer() {
   }, [filteredEntries, sortKey, sortDir])
 
   const stats = useMemo(() => (result ? buildStats(result.entries) : null), [result])
-  const dimensionBalance = useMemo(() => (result ? buildDimensionBalance(result.entries) : []), [result])
-  const unbalancedDims = dimensionBalance.filter(d => !d.balanced)
+  const postingBalance = useMemo(() => (result ? buildPostingBalance(result.entries) : []), [result])
+  const unbalancedPostings = postingBalance.filter(p => !p.balanced)
 
   function handleVisualize() {
     setError('')
@@ -356,7 +359,7 @@ export default function ShadowLedgerVisualizer() {
 
           <div className={card}>
             <div className={cardTitle}>
-              <span className={unbalancedDims.length === 0 ? cardTitleDotGreen : cardTitleDot} /> Summary
+              <span className={unbalancedPostings.length === 0 ? cardTitleDotGreen : cardTitleDot} /> Summary
             </div>
             <div className={statTileRow}>
               <StatTile label="Entries" value={stats.count.toLocaleString()} />
@@ -366,17 +369,17 @@ export default function ShadowLedgerVisualizer() {
               <StatTile label="Policies" value={stats.policies.toLocaleString()} />
               <StatTile label="Batches" value={stats.batches.toLocaleString()} />
             </div>
-            {unbalancedDims.length > 0 ? (
+            {unbalancedPostings.length > 0 ? (
               <div data-testid="alert-error" className={cx(alert, alertVariants.error)}>
-                <strong>{unbalancedDims.length} dimension{unbalancedDims.length === 1 ? '' : 's'} out of balance:</strong>
+                <strong>{unbalancedPostings.length} posting{unbalancedPostings.length === 1 ? '' : 's'} out of balance:</strong>
                 <ul className="mt-1 pl-[18px]">
-                  {unbalancedDims.map(d => (
-                    <li className="my-0.5" key={d.dimension}>{d.dimension} — debit {d.debit} vs credit {d.credit} (Δ{d.diff})</li>
+                  {unbalancedPostings.map(p => (
+                    <li className="my-0.5" key={p.posting}>{p.posting} — debit {p.debit} vs credit {p.credit} (Δ{p.diff})</li>
                   ))}
                 </ul>
               </div>
             ) : (
-              <div className={cx(alert, alertVariants.success)}>✓ Debit and credit totals balance for every dimension.</div>
+              <div className={cx(alert, alertVariants.success)}>✓ Debit and credit totals balance for every posting (transaction reference + operation).</div>
             )}
           </div>
 
