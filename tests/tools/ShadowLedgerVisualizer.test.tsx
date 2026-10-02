@@ -221,7 +221,7 @@ describe("ShadowLedgerVisualizer", () => {
     visualize(UNBALANCED_ENTRIES);
     expect(screen.getByText(/posting.*out of balance/i)).toBeInTheDocument();
     expect(
-      screen.getByText(/REF-2 · Refund — debit 10 vs credit 8/i),
+      screen.getByText(/REF-2 · Refund — debit 10 vs credit 8/iu),
     ).toBeInTheDocument();
   });
 

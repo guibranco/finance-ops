@@ -407,16 +407,19 @@ const LABEL_OVERRIDES: Record<string, string> = {
   paymentScheduleItemId: "Schedule Item ID",
 };
 
+/** Turns a camelCase key into a Title Case label. */
 function humanize(key: string): string {
   return key
     .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
     .replace(/^./, (c) => c.toUpperCase());
 }
 
+/** Column header for an entry key, preferring the explicit overrides. */
 function labelFor(key: string): string {
   return LABEL_OVERRIDES[key] || humanize(key);
 }
 
+/** Rounds to 2 decimal places (currency precision). */
 function round2(n: number): number {
   return Math.round((n + Number.EPSILON) * 100) / 100;
 }
@@ -442,6 +445,7 @@ function parseEntriesPayload(text: string): EntriesPayload {
   return { entries, isTruncated };
 }
 
+/** Every key present across the entries, in first-seen order. */
 function collectColumns(entries: ShadowLedgerEntry[]): string[] {
   const seen = new Set<string>();
   const cols: string[] = [];
@@ -456,6 +460,7 @@ function collectColumns(entries: ShadowLedgerEntry[]): string[] {
   return cols;
 }
 
+/** Stringifies any value without producing "[object Object]". */
 function toSafeString(value: unknown): string {
   if (value === null || value === undefined) return "";
   if (typeof value === "string") return value;
@@ -463,6 +468,7 @@ function toSafeString(value: unknown): string {
   return JSON.stringify(value);
 }
 
+/** Display text for a table cell: fixed-2 amounts, trimmed dates, "—" for empty. */
 function formatValue(key: string, value: unknown): string {
   if (value === null || value === undefined || value === "") return "—";
   if (key === "amount") {
@@ -479,6 +485,7 @@ function formatValue(key: string, value: unknown): string {
   return toSafeString(value);
 }
 
+/** Sort comparator: empty values first, numbers numerically, everything else as text. */
 function compareValues(a: unknown, b: unknown): number {
   if (a === undefined || a === null) return -1;
   if (b === undefined || b === null) return 1;
@@ -486,6 +493,7 @@ function compareValues(a: unknown, b: unknown): number {
   return toSafeString(a).localeCompare(toSafeString(b));
 }
 
+/** Summary totals and distinct policy/batch counts for the summary tiles. */
 function buildStats(entries: ShadowLedgerEntry[]): Stats {
   const policies = new Set<string>();
   const batches = new Set<string>();
@@ -520,9 +528,9 @@ function buildPostingBalance(entries: ShadowLedgerEntry[]): PostingBalance[] {
     const dir = (e.glEntry || "").toString().toLowerCase();
     if (dir !== "debit" && dir !== "credit") return;
     const posting = `${toSafeString(e.transactionReference) || "(no reference)"} · ${e.operation || "(no operation)"}`;
-    if (!byPosting.has(posting))
-      byPosting.set(posting, { debit: 0, credit: 0 });
-    byPosting.get(posting)![dir] += Math.abs(Number(e.amount) || 0);
+    const totals = byPosting.get(posting) ?? { debit: 0, credit: 0 };
+    totals[dir] += Math.abs(Number(e.amount) || 0);
+    byPosting.set(posting, totals);
   });
   return [...byPosting.entries()]
     .map(([posting, v]) => {
@@ -539,18 +547,20 @@ function buildPostingBalance(entries: ShadowLedgerEntry[]): PostingBalance[] {
     .sort((a, b) => a.posting.localeCompare(b.posting));
 }
 
+/** Triggers a browser download of `text` as a CSV file. */
 function downloadCsv(filename: string, text: string) {
   const blob = new Blob([text], { type: "text/csv" });
   const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
   URL.revokeObjectURL(url);
 }
 
+/** A single labelled figure in the summary row. */
 function StatTile({ label, value }: { label: string; value: string }) {
   return (
     <div className={statTile}>
@@ -560,6 +570,119 @@ function StatTile({ label, value }: { label: string; value: string }) {
   );
 }
 
+/** Success alert when every posting balances, otherwise the list of unbalanced postings. */
+function BalanceAlert({ unbalanced }: { unbalanced: PostingBalance[] }) {
+  if (unbalanced.length === 0) {
+    return (
+      <div className={cx(alert, alertVariants.success)}>
+        ✓ Debit and credit totals balance for every posting (transaction
+        reference + operation).
+      </div>
+    );
+  }
+  return (
+    <div data-testid="alert-error" className={cx(alert, alertVariants.error)}>
+      <strong>
+        {unbalanced.length} posting
+        {unbalanced.length === 1 ? "" : "s"} out of balance:
+      </strong>
+      <ul className="mt-1 pl-[18px]">
+        {unbalanced.map((p) => (
+          <li className="my-0.5" key={p.posting}>
+            {p.posting} — debit {p.debit} vs credit {p.credit} (Δ{p.diff})
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+/** One table cell, with GL-entry badges and signed amount colouring. */
+function EntryCell({
+  entry,
+  field,
+}: {
+  entry: ShadowLedgerEntry;
+  field: string;
+}) {
+  if (field === "glEntry") {
+    const dir = (entry.glEntry || "").toString().toLowerCase();
+    const isDirection = dir === "debit" || dir === "credit";
+    return (
+      <td className={vizTd}>
+        {isDirection ? (
+          <span className={entryGlEntryVariants[dir]}>
+            {String(entry.glEntry)}
+          </span>
+        ) : (
+          formatValue(field, entry[field])
+        )}
+      </td>
+    );
+  }
+  if (field === "amount") {
+    const amt = Number(entry.amount) || 0;
+    return (
+      <td className={cx(vizTdNum, amt < 0 ? amtNeg : amtPos)}>
+        {formatValue(field, entry[field])}
+      </td>
+    );
+  }
+  return <td className={vizTd}>{formatValue(field, entry[field])}</td>;
+}
+
+interface EntriesTableProps {
+  entries: ShadowLedgerEntry[];
+  columns: string[];
+  sortKey: string;
+  sortDir: "asc" | "desc";
+  onSort: (key: string) => void;
+}
+
+/** Sortable table of entries over the visible columns. */
+function EntriesTable({
+  entries,
+  columns,
+  sortKey,
+  sortDir,
+  onSort,
+}: EntriesTableProps) {
+  return (
+    <div className={vizTableWrap}>
+      <table className={vizTable}>
+        <thead>
+          <tr className={vizTheadRow}>
+            {columns.map((key) => (
+              <th
+                key={key}
+                className={key === "amount" ? vizThNum : vizTh}
+                onClick={() => onSort(key)}
+              >
+                {labelFor(key)}
+                {sortKey === key && (
+                  <span className={vizSortArrow}>
+                    {sortDir === "asc" ? "▲" : "▼"}
+                  </span>
+                )}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {entries.map((e, idx) => (
+            <tr key={String(e.id ?? idx)} className={vizRowHover}>
+              {columns.map((key) => (
+                <EntryCell key={key} entry={e} field={key} />
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+/** Paste-and-inspect tool for Shadow Ledger entries, with a per-posting balance check. */
 export default function ShadowLedgerVisualizer() {
   const [input, setInput] = useState("");
   const [error, setError] = useState("");
@@ -605,8 +728,7 @@ export default function ShadowLedgerVisualizer() {
         return false;
       if (operationFilter !== "all" && e.operation !== operationFilter)
         return false;
-      if (term && !JSON.stringify(e).toLowerCase().includes(term)) return false;
-      return true;
+      return !term || JSON.stringify(e).toLowerCase().includes(term);
     });
   }, [result, search, glEntryFilter, operationFilter]);
 
@@ -629,6 +751,7 @@ export default function ShadowLedgerVisualizer() {
   );
   const unbalancedPostings = postingBalance.filter((p) => !p.balanced);
 
+  /** Parses the pasted JSON and resets filters and sorting for the new result. */
   function handleVisualize() {
     setError("");
     setResult(null);
@@ -649,6 +772,7 @@ export default function ShadowLedgerVisualizer() {
     }
   }
 
+  /** Sorts by `key`, toggling direction when it is already the sort key. */
   function handleSort(key: string) {
     if (key === sortKey) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
     else {
@@ -657,14 +781,15 @@ export default function ShadowLedgerVisualizer() {
     }
   }
 
+  /** Exports the filtered, sorted entries over the visible columns as CSV. */
   function handleDownload() {
     if (!sortedEntries.length) return;
     const header = visibleKeys.map((k) => `"${labelFor(k)}"`).join(",");
     const lines = sortedEntries.map((e) =>
       visibleKeys
         .map((k) => {
-          const s = toSafeString(e[k]);
-          return `"${s.replace(/"/g, '""')}"`;
+          const cell = toSafeString(e[k]);
+          return `"${cell.replace(/"/g, '""')}"`;
         })
         .join(","),
     );
@@ -771,30 +896,7 @@ export default function ShadowLedgerVisualizer() {
                 value={stats.batches.toLocaleString()}
               />
             </div>
-            {unbalancedPostings.length > 0 ? (
-              <div
-                data-testid="alert-error"
-                className={cx(alert, alertVariants.error)}
-              >
-                <strong>
-                  {unbalancedPostings.length} posting
-                  {unbalancedPostings.length === 1 ? "" : "s"} out of balance:
-                </strong>
-                <ul className="mt-1 pl-[18px]">
-                  {unbalancedPostings.map((p) => (
-                    <li className="my-0.5" key={p.posting}>
-                      {p.posting} — debit {p.debit} vs credit {p.credit} (Δ
-                      {p.diff})
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ) : (
-              <div className={cx(alert, alertVariants.success)}>
-                ✓ Debit and credit totals balance for every posting (transaction
-                reference + operation).
-              </div>
-            )}
+            <BalanceAlert unbalanced={unbalancedPostings} />
           </div>
 
           <div className={card}>
@@ -843,68 +945,13 @@ export default function ShadowLedgerVisualizer() {
               </label>
             </div>
 
-            <div className={vizTableWrap}>
-              <table className={vizTable}>
-                <thead>
-                  <tr className={vizTheadRow}>
-                    {visibleKeys.map((key) => (
-                      <th
-                        key={key}
-                        className={key === "amount" ? vizThNum : vizTh}
-                        onClick={() => handleSort(key)}
-                      >
-                        {labelFor(key)}
-                        {sortKey === key && (
-                          <span className={vizSortArrow}>
-                            {sortDir === "asc" ? "▲" : "▼"}
-                          </span>
-                        )}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {sortedEntries.map((e, idx) => (
-                    <tr key={String(e.id ?? idx)} className={vizRowHover}>
-                      {visibleKeys.map((key) => {
-                        if (key === "glEntry") {
-                          const dir = (e.glEntry || "")
-                            .toString()
-                            .toLowerCase();
-                          return (
-                            <td key={key} className={vizTd}>
-                              {dir === "debit" || dir === "credit" ? (
-                                <span className={entryGlEntryVariants[dir]}>
-                                  {String(e.glEntry)}
-                                </span>
-                              ) : (
-                                formatValue(key, e[key])
-                              )}
-                            </td>
-                          );
-                        }
-                        if (key === "amount") {
-                          const n = Number(e.amount) || 0;
-                          return (
-                            <td
-                              key={key}
-                              className={cx(vizTdNum, n < 0 ? amtNeg : amtPos)}
-                            >
-                              {formatValue(key, e[key])}
-                            </td>
-                          );
-                        }
-                        return (
-                          <td key={key} className={vizTd}>
-                            {formatValue(key, e[key])}
-                          </td>
-                        );
-                      })}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <EntriesTable
+              entries={sortedEntries}
+              columns={visibleKeys}
+              sortKey={sortKey}
+              sortDir={sortDir}
+              onSort={handleSort}
+            />
 
             <div className={btnRow}>
               <button
