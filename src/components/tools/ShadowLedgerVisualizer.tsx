@@ -806,6 +806,7 @@ export default function ShadowLedgerVisualizer() {
     const report = currentReport();
     if (!report) return;
     setImageError("");
+    setImageExported(false);
     setExportingImage(true);
     try {
       const blob = await renderReportImage(report, imageFormat);
@@ -825,6 +826,7 @@ export default function ShadowLedgerVisualizer() {
     const report = currentReport();
     if (!report) return;
     setImageError("");
+    setImageCopied(false);
     setCopyingImage(true);
     try {
       // Start rendering without awaiting it: the clipboard write must begin inside the click.

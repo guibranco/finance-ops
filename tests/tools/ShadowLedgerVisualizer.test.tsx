@@ -448,5 +448,53 @@ describe("ShadowLedgerVisualizer", () => {
         expect(screen.getByText(/can't copy images/i)).toBeInTheDocument(),
       );
     });
+
+    it("clears a previous success state when a retry fails", async () => {
+      class FakeClipboardItem {
+        items: Record<string, Promise<Blob>>;
+        constructor(items: Record<string, Promise<Blob>>) {
+          this.items = items;
+        }
+      }
+      vi.stubGlobal("ClipboardItem", FakeClipboardItem);
+      const write = vi
+        .fn()
+        .mockResolvedValueOnce(undefined)
+        .mockRejectedValueOnce(new Error("boom"));
+      const original = Object.getOwnPropertyDescriptor(navigator, "clipboard")!;
+      Object.defineProperty(navigator, "clipboard", {
+        value: { write },
+        configurable: true,
+      });
+      vi.spyOn(HTMLImageElement.prototype, "src", "set").mockImplementation(
+        function (this: HTMLImageElement) {
+          setTimeout(() => this.onload?.(new Event("load")));
+        },
+      );
+      vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({
+        fillRect: vi.fn(),
+        drawImage: vi.fn(),
+      } as unknown as CanvasRenderingContext2D);
+      vi.spyOn(HTMLCanvasElement.prototype, "toBlob").mockImplementation(
+        (cb: BlobCallback, type?: string) => cb(new Blob(["x"], { type })),
+      );
+      try {
+        render(<ShadowLedgerVisualizer />);
+        visualize(BALANCED_ENTRIES);
+        fireEvent.click(screen.getByText("Copy image"));
+        await waitFor(() =>
+          expect(screen.getByText("Copied")).toBeInTheDocument(),
+        );
+        fireEvent.click(screen.getByText("Copied"));
+        await waitFor(() =>
+          expect(screen.getByText(/could not copy/i)).toBeInTheDocument(),
+        );
+        expect(screen.queryByText("Copied")).not.toBeInTheDocument();
+        expect(screen.getByText("Copy image")).toBeInTheDocument();
+      } finally {
+        vi.unstubAllGlobals();
+        Object.defineProperty(navigator, "clipboard", original);
+      }
+    });
   });
 });
