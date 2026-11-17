@@ -1,5 +1,5 @@
-import { describe, it, expect } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { describe, it, expect, vi, afterEach } from "vitest";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import ShadowLedgerVisualizer from "../../src/components/tools/ShadowLedgerVisualizer.tsx";
 
 // ── Fixtures ───────────────────────────────────────────────────────────────
@@ -313,5 +313,86 @@ describe("ShadowLedgerVisualizer", () => {
     visualize(BALANCED_ENTRIES);
     fireEvent.click(screen.getByText("Policy Number"));
     expect(screen.getByText("Policy Number").textContent).toContain("▲");
+  });
+
+  describe("image export", () => {
+    afterEach(() => vi.restoreAllMocks());
+
+    /** Text of the blob handed to the download link (the last createObjectURL call). */
+    async function exportedSvg(): Promise<string> {
+      const calls = vi.mocked(URL.createObjectURL).mock.calls;
+      return (calls.at(-1)![0] as Blob).text();
+    }
+
+    it("exports the summary and the filtered entries as SVG", async () => {
+      render(<ShadowLedgerVisualizer />);
+      visualize(UNBALANCED_ENTRIES);
+      fireEvent.change(screen.getByDisplayValue("All operations"), {
+        target: { value: "Refund" },
+      });
+      fireEvent.change(screen.getByLabelText(/image format/i), {
+        target: { value: "svg" },
+      });
+      fireEvent.click(screen.getByText(/export summary & entries as image/i));
+
+      await waitFor(() =>
+        expect(screen.getByText("Exported")).toBeInTheDocument(),
+      );
+      const link = vi.mocked(HTMLAnchorElement.prototype.click).mock
+        .contexts[0] as HTMLAnchorElement;
+      expect(link.download).toBe("shadow-ledger-summary.svg");
+
+      const svg = await exportedSvg();
+      expect(svg).toMatch(/^<svg /);
+      expect(svg).toContain("Total debit");
+      expect(svg).toContain("out of balance");
+      expect(svg).toContain("truncated");
+      expect(svg).toContain("Entries (2 of 2) · filtered by operation: Refund");
+      expect(svg).toContain("Policy Number");
+    });
+
+    it("shows an error when the image cannot be rendered", async () => {
+      vi.spyOn(HTMLImageElement.prototype, "src", "set").mockImplementation(
+        function (this: HTMLImageElement) {
+          setTimeout(() => this.onerror?.(new Event("error")));
+        },
+      );
+      render(<ShadowLedgerVisualizer />);
+      visualize(BALANCED_ENTRIES);
+      fireEvent.click(screen.getByText(/export summary & entries as image/i));
+      await waitFor(() =>
+        expect(screen.getByText(/could not render/i)).toBeInTheDocument(),
+      );
+      expect(
+        screen.getByText(/export summary & entries as image/i).closest("button"),
+      ).not.toBeDisabled();
+    });
+
+    it("names JPEG exports .jpg", async () => {
+      vi.spyOn(HTMLImageElement.prototype, "src", "set").mockImplementation(
+        function (this: HTMLImageElement) {
+          setTimeout(() => this.onload?.(new Event("load")));
+        },
+      );
+      vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({
+        fillRect: vi.fn(),
+        drawImage: vi.fn(),
+      } as unknown as CanvasRenderingContext2D);
+      vi.spyOn(HTMLCanvasElement.prototype, "toBlob").mockImplementation(
+        (cb: BlobCallback, type?: string) => cb(new Blob(["x"], { type })),
+      );
+      render(<ShadowLedgerVisualizer />);
+      visualize(BALANCED_ENTRIES);
+      fireEvent.change(screen.getByLabelText(/image format/i), {
+        target: { value: "jpeg" },
+      });
+      fireEvent.click(screen.getByText(/export summary & entries as image/i));
+      await waitFor(() =>
+        expect(screen.getByText("Exported")).toBeInTheDocument(),
+      );
+      const link = vi.mocked(HTMLAnchorElement.prototype.click).mock
+        .contexts[0] as HTMLAnchorElement;
+      expect(link.download).toBe("shadow-ledger-summary.jpg");
+    });
   });
 });
