@@ -1,5 +1,14 @@
 import { useMemo, useState } from "react";
-import { AlertTriangle, Check, Download } from "lucide-react";
+import { AlertTriangle, Check, Download, Image as ImageIcon } from "lucide-react";
+import {
+  IMAGE_FORMATS,
+  downloadBlob,
+  renderReportImage,
+  type CellTone,
+  type ImageFormat,
+  type ReportImageInput,
+  type ReportNotice,
+} from "../../lib/reportImage";
 import {
   alert,
   alertVariants,
@@ -341,15 +350,89 @@ function buildPostingBalance(entries: ShadowLedgerEntry[]): PostingBalance[] {
 
 /** Triggers a browser download of `text` as a CSV file. */
 function downloadCsv(filename: string, text: string) {
-  const blob = new Blob([text], { type: "text/csv" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = filename;
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  URL.revokeObjectURL(url);
+  downloadBlob(filename, new Blob([text], { type: "text/csv" }));
+}
+
+/** Colour hint for an exported cell, mirroring the on-screen badges and amount colours. */
+function cellTone(entry: ShadowLedgerEntry, field: string): CellTone | undefined {
+  if (field === "glEntry") {
+    const dir = (entry.glEntry || "").toString().toLowerCase();
+    return dir === "debit" || dir === "credit" ? dir : undefined;
+  }
+  if (field === "amount") {
+    return (Number(entry.amount) || 0) < 0 ? "negative" : "positive";
+  }
+  return undefined;
+}
+
+/** Describes the active search/filters, so an exported image says what subset it shows. */
+function describeFilters(
+  search: string,
+  glEntryFilter: string,
+  operationFilter: string,
+): string {
+  const parts: string[] = [];
+  if (glEntryFilter !== "all") parts.push(`GL entry: ${glEntryFilter}`);
+  if (operationFilter !== "all") parts.push(`operation: ${operationFilter}`);
+  if (search.trim()) parts.push(`search: "${search.trim()}"`);
+  return parts.length ? ` · filtered by ${parts.join(", ")}` : "";
+}
+
+/** Assembles the summary and the visible entries into the exportable report model. */
+function buildReport(args: {
+  stats: Stats;
+  unbalanced: PostingBalance[];
+  isTruncated: boolean;
+  entries: ShadowLedgerEntry[];
+  totalEntries: number;
+  columns: string[];
+  filters: string;
+}): ReportImageInput {
+  const { stats, unbalanced, entries, columns } = args;
+  const notices: ReportNotice[] = [
+    unbalanced.length === 0
+      ? {
+          tone: "success",
+          title:
+            "✓ Debit and credit totals balance for every posting (transaction reference + operation).",
+        }
+      : {
+          tone: "error",
+          title: `${unbalanced.length} posting${unbalanced.length === 1 ? "" : "s"} out of balance:`,
+          lines: unbalanced.map(
+            (p) =>
+              `${p.posting} — debit ${p.debit} vs credit ${p.credit} (Δ${p.diff})`,
+          ),
+        },
+  ];
+  if (args.isTruncated) {
+    notices.push({
+      tone: "warning",
+      title:
+        "This result set is truncated — not all matching entries were returned by the source query.",
+    });
+  }
+  return {
+    title: "Shadow Ledger — Summary & Entries",
+    subtitle: `Generated ${new Date().toLocaleString()}`,
+    stats: [
+      { label: "Entries", value: stats.count.toLocaleString() },
+      { label: "Net amount", value: stats.net.toLocaleString() },
+      { label: "Total debit", value: stats.debit.toLocaleString() },
+      { label: "Total credit", value: stats.credit.toLocaleString() },
+      { label: "Policies", value: stats.policies.toLocaleString() },
+      { label: "Batches", value: stats.batches.toLocaleString() },
+    ],
+    notices,
+    tableTitle: `Entries (${entries.length.toLocaleString()} of ${args.totalEntries.toLocaleString()})${args.filters}`,
+    columns: columns.map((k) => ({ label: labelFor(k), numeric: k === "amount" })),
+    rows: entries.map((e) =>
+      columns.map((k) => {
+        const text = formatValue(k, e[k]);
+        return { text: text === "—" ? "" : text, tone: cellTone(e, k) };
+      }),
+    ),
+  };
 }
 
 /** A single labelled figure in the summary row. */
@@ -584,6 +667,10 @@ export default function ShadowLedgerVisualizer() {
   const [sortKey, setSortKey] = useState("id");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   const [downloaded, setDownloaded] = useState(false);
+  const [imageFormat, setImageFormat] = useState<ImageFormat>("png");
+  const [exportingImage, setExportingImage] = useState(false);
+  const [imageExported, setImageExported] = useState(false);
+  const [imageError, setImageError] = useState("");
 
   const allColumns = useMemo(
     () => (result ? collectColumns(result.entries) : []),
@@ -691,6 +778,37 @@ export default function ShadowLedgerVisualizer() {
     setTimeout(() => setDownloaded(false), 2000);
   }
 
+  /** Exports the summary plus the filtered, sorted entries (visible columns) as an image. */
+  async function handleExportImage() {
+    if (!result || !stats) return;
+    setImageError("");
+    setExportingImage(true);
+    try {
+      const report = buildReport({
+        stats,
+        unbalanced: unbalancedPostings,
+        isTruncated: result.isTruncated,
+        entries: sortedEntries,
+        totalEntries: result.entries.length,
+        columns: visibleKeys,
+        filters: describeFilters(search, glEntryFilter, operationFilter),
+      });
+      const blob = await renderReportImage(report, imageFormat);
+      const ext = imageFormat === "jpeg" ? "jpg" : imageFormat;
+      downloadBlob(`shadow-ledger-summary.${ext}`, blob);
+      setImageExported(true);
+      setTimeout(() => setImageExported(false), 2000);
+    } catch (e) {
+      setImageError((e as Error).message);
+    } finally {
+      setExportingImage(false);
+    }
+  }
+
+  let imageButtonLabel = "Export summary & entries as image";
+  if (exportingImage) imageButtonLabel = "Exporting…";
+  else if (imageExported) imageButtonLabel = "Exported";
+
   return (
     <div className="flex flex-col gap-5">
       <div className={card}>
@@ -795,7 +913,38 @@ export default function ShadowLedgerVisualizer() {
               {downloaded ? <Check size={14} /> : <Download size={14} />}
               {downloaded ? "Downloaded" : "Download visible columns as CSV"}
             </button>
+            <div className="inline-flex items-center gap-2">
+              <select
+                aria-label="Image format"
+                className={cx(formSelect, "w-auto")}
+                value={imageFormat}
+                onChange={(e) => setImageFormat(e.target.value as ImageFormat)}
+              >
+                {IMAGE_FORMATS.map((f) => (
+                  <option key={f.value} value={f.value}>
+                    {f.label}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                className={cx(btn, btnSecondary)}
+                onClick={() => void handleExportImage()}
+                disabled={exportingImage}
+              >
+                {imageExported ? <Check size={14} /> : <ImageIcon size={14} />}
+                {imageButtonLabel}
+              </button>
+            </div>
           </div>
+          {imageError && (
+            <div
+              data-testid="alert-error"
+              className={cx(alert, alertVariants.error)}
+            >
+              {imageError}
+            </div>
+          )}
         </div>
       )}
     </div>
