@@ -394,5 +394,59 @@ describe("ShadowLedgerVisualizer", () => {
         .contexts[0] as HTMLAnchorElement;
       expect(link.download).toBe("shadow-ledger-summary.jpg");
     });
+
+    it("copies the report to the clipboard as PNG", async () => {
+      vi.spyOn(HTMLImageElement.prototype, "src", "set").mockImplementation(
+        function (this: HTMLImageElement) {
+          setTimeout(() => this.onload?.(new Event("load")));
+        },
+      );
+      vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({
+        fillRect: vi.fn(),
+        drawImage: vi.fn(),
+      } as unknown as CanvasRenderingContext2D);
+      vi.spyOn(HTMLCanvasElement.prototype, "toBlob").mockImplementation(
+        (cb: BlobCallback, type?: string) => cb(new Blob(["x"], { type })),
+      );
+      class FakeClipboardItem {
+        items: Record<string, Promise<Blob>>;
+        constructor(items: Record<string, Promise<Blob>>) {
+          this.items = items;
+        }
+      }
+      vi.stubGlobal("ClipboardItem", FakeClipboardItem);
+      const write = vi.fn(async (items: FakeClipboardItem[]) => {
+        await items[0].items["image/png"];
+      });
+      const original = Object.getOwnPropertyDescriptor(navigator, "clipboard")!;
+      Object.defineProperty(navigator, "clipboard", {
+        value: { write },
+        configurable: true,
+      });
+      try {
+        render(<ShadowLedgerVisualizer />);
+        visualize(BALANCED_ENTRIES);
+        fireEvent.click(screen.getByText("Copy image"));
+        await waitFor(() =>
+          expect(screen.getByText("Copied")).toBeInTheDocument(),
+        );
+        expect(write).toHaveBeenCalledTimes(1);
+        const blob = await write.mock.calls[0][0][0].items["image/png"];
+        expect(blob.type).toBe("image/png");
+        expect(HTMLAnchorElement.prototype.click).not.toHaveBeenCalled();
+      } finally {
+        vi.unstubAllGlobals();
+        Object.defineProperty(navigator, "clipboard", original);
+      }
+    });
+
+    it("shows an error when the browser cannot copy images", async () => {
+      render(<ShadowLedgerVisualizer />);
+      visualize(BALANCED_ENTRIES);
+      fireEvent.click(screen.getByText("Copy image"));
+      await waitFor(() =>
+        expect(screen.getByText(/can't copy images/i)).toBeInTheDocument(),
+      );
+    });
   });
 });
