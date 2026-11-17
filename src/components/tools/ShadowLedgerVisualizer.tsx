@@ -1,7 +1,14 @@
 import { useMemo, useState } from "react";
-import { AlertTriangle, Check, Download, Image as ImageIcon } from "lucide-react";
+import {
+  AlertTriangle,
+  Check,
+  Copy,
+  Download,
+  Image as ImageIcon,
+} from "lucide-react";
 import {
   IMAGE_FORMATS,
+  copyPngToClipboard,
   downloadBlob,
   renderReportImage,
   type CellTone,
@@ -670,6 +677,8 @@ export default function ShadowLedgerVisualizer() {
   const [imageFormat, setImageFormat] = useState<ImageFormat>("png");
   const [exportingImage, setExportingImage] = useState(false);
   const [imageExported, setImageExported] = useState(false);
+  const [copyingImage, setCopyingImage] = useState(false);
+  const [imageCopied, setImageCopied] = useState(false);
   const [imageError, setImageError] = useState("");
 
   const allColumns = useMemo(
@@ -778,21 +787,28 @@ export default function ShadowLedgerVisualizer() {
     setTimeout(() => setDownloaded(false), 2000);
   }
 
-  /** Exports the summary plus the filtered, sorted entries (visible columns) as an image. */
+  /** The summary plus the filtered, sorted entries (visible columns), as an image report. */
+  function currentReport(): ReportImageInput | null {
+    if (!result || !stats) return null;
+    return buildReport({
+      stats,
+      unbalanced: unbalancedPostings,
+      isTruncated: result.isTruncated,
+      entries: sortedEntries,
+      totalEntries: result.entries.length,
+      columns: visibleKeys,
+      filters: describeFilters(search, glEntryFilter, operationFilter),
+    });
+  }
+
+  /** Downloads the report image in the selected format. */
   async function handleExportImage() {
-    if (!result || !stats) return;
+    const report = currentReport();
+    if (!report) return;
     setImageError("");
+    setImageExported(false);
     setExportingImage(true);
     try {
-      const report = buildReport({
-        stats,
-        unbalanced: unbalancedPostings,
-        isTruncated: result.isTruncated,
-        entries: sortedEntries,
-        totalEntries: result.entries.length,
-        columns: visibleKeys,
-        filters: describeFilters(search, glEntryFilter, operationFilter),
-      });
       const blob = await renderReportImage(report, imageFormat);
       const ext = imageFormat === "jpeg" ? "jpg" : imageFormat;
       downloadBlob(`shadow-ledger-summary.${ext}`, blob);
@@ -804,6 +820,29 @@ export default function ShadowLedgerVisualizer() {
       setExportingImage(false);
     }
   }
+
+  /** Copies the report image to the clipboard as PNG (the only image type clipboards accept). */
+  async function handleCopyImage() {
+    const report = currentReport();
+    if (!report) return;
+    setImageError("");
+    setImageCopied(false);
+    setCopyingImage(true);
+    try {
+      // Start rendering without awaiting it: the clipboard write must begin inside the click.
+      await copyPngToClipboard(renderReportImage(report, "png"));
+      setImageCopied(true);
+      setTimeout(() => setImageCopied(false), 2000);
+    } catch (e) {
+      setImageError((e as Error).message);
+    } finally {
+      setCopyingImage(false);
+    }
+  }
+
+  let copyButtonLabel = "Copy image";
+  if (copyingImage) copyButtonLabel = "Copying…";
+  else if (imageCopied) copyButtonLabel = "Copied";
 
   let imageButtonLabel = "Export summary & entries as image";
   if (exportingImage) imageButtonLabel = "Exporting…";
@@ -934,6 +973,16 @@ export default function ShadowLedgerVisualizer() {
               >
                 {imageExported ? <Check size={14} /> : <ImageIcon size={14} />}
                 {imageButtonLabel}
+              </button>
+              <button
+                type="button"
+                className={cx(btn, btnGhost)}
+                onClick={() => void handleCopyImage()}
+                disabled={copyingImage}
+                title="Copy the summary and entries to the clipboard as a PNG image, ready to paste into an email, Teams or a document"
+              >
+                {imageCopied ? <Check size={14} /> : <Copy size={14} />}
+                {copyButtonLabel}
               </button>
             </div>
           </div>

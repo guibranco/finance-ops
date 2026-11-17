@@ -1,6 +1,8 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import {
   buildReportSvg,
+  canCopyImage,
+  copyPngToClipboard,
   downloadBlob,
   escapeXml,
   rasterScale,
@@ -185,5 +187,66 @@ describe('downloadBlob', () => {
     expect(click).toHaveBeenCalledTimes(1)
     expect((click.mock.contexts[0] as HTMLAnchorElement).download).toBe('report.png')
     expect(document.querySelector('a[download]')).toBeNull()
+  })
+})
+
+describe('copyPngToClipboard', () => {
+  /** Minimal ClipboardItem stand-in (jsdom has none) that records what it was given. */
+  class FakeClipboardItem {
+    items: Record<string, Promise<Blob>>;
+        constructor(items: Record<string, Promise<Blob>>) {
+          this.items = items;
+        }
+  }
+
+  function stubClipboard(write: (items: FakeClipboardItem[]) => Promise<void>) {
+    vi.stubGlobal('ClipboardItem', FakeClipboardItem)
+    const writeMock = vi.fn(write)
+    Object.defineProperty(navigator, 'clipboard', { value: { write: writeMock }, configurable: true, writable: true })
+    return writeMock
+  }
+
+  const original = Object.getOwnPropertyDescriptor(navigator, 'clipboard')!
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    Object.defineProperty(navigator, 'clipboard', original)
+  })
+
+  it('reports no support without ClipboardItem / clipboard.write', async () => {
+    expect(canCopyImage()).toBe(false)
+    await expect(copyPngToClipboard(Promise.resolve(new Blob()))).rejects.toThrow(/can't copy images/i)
+  })
+
+  it('swallows the pending render when unsupported, so it never becomes an unhandled rejection', async () => {
+    const png = Promise.reject(new Error('render failed'))
+    await expect(copyPngToClipboard(png)).rejects.toThrow(/can't copy images/i)
+  })
+
+  it('writes the PNG promise straight into a ClipboardItem', async () => {
+    const write = stubClipboard(() => Promise.resolve())
+    expect(canCopyImage()).toBe(true)
+    const png = Promise.resolve(new Blob(['x'], { type: 'image/png' }))
+    await copyPngToClipboard(png)
+    expect(write).toHaveBeenCalledTimes(1)
+    const [item] = write.mock.calls[0][0]
+    expect(Object.keys(item.items)).toEqual(['image/png'])
+    expect(item.items['image/png']).toBe(png) // the promise itself, not an awaited blob
+  })
+
+  it('explains a blocked clipboard permission', async () => {
+    stubClipboard(() => Promise.reject(new DOMException('denied', 'NotAllowedError')))
+    await expect(copyPngToClipboard(Promise.resolve(new Blob()))).rejects.toThrow(/blocked by the browser/i)
+  })
+
+  it('reports other clipboard failures generically', async () => {
+    stubClipboard(() => Promise.reject(new Error('boom')))
+    await expect(copyPngToClipboard(Promise.resolve(new Blob()))).rejects.toThrow(/could not copy/i)
+  })
+
+  it('surfaces the rendering error when the image itself failed', async () => {
+    stubClipboard(() => Promise.reject(new DOMException('aborted', 'AbortError')))
+    await expect(copyPngToClipboard(Promise.reject(new Error('Too many entries')))).rejects.toThrow(
+      'Too many entries',
+    )
   })
 })

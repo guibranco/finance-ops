@@ -330,3 +330,31 @@ export function downloadBlob(filename: string, blob: Blob): void {
   link.remove()
   URL.revokeObjectURL(url)
 }
+
+/** Whether this browser can put an image on the clipboard (async Clipboard API + ClipboardItem). */
+export function canCopyImage(): boolean {
+  return typeof ClipboardItem !== 'undefined' && typeof navigator.clipboard?.write === 'function'
+}
+
+/**
+ * Copies a PNG to the clipboard. PNG is the only image type browsers accept on the clipboard.
+ *
+ * Takes the blob as a *promise* and hands it straight to `ClipboardItem`, so the clipboard
+ * write starts synchronously inside the click handler — Safari rejects the write if the
+ * user gesture has expired by the time it is made (e.g. after awaiting the rasterization).
+ */
+export async function copyPngToClipboard(png: Promise<Blob>): Promise<void> {
+  if (!canCopyImage()) {
+    png.catch(() => undefined) // nothing will await it; don't surface an unhandled rejection
+    throw new Error("This browser can't copy images to the clipboard. Use Export instead.")
+  }
+  try {
+    await navigator.clipboard.write([new ClipboardItem({ 'image/png': png })])
+  } catch (e) {
+    await png // if rendering itself failed, surface that more specific error
+    if (e instanceof DOMException && e.name === 'NotAllowedError') {
+      throw new Error('Clipboard access was blocked by the browser. Allow clipboard access for this site, or use Export instead.', { cause: e })
+    }
+    throw new Error('Could not copy the image to the clipboard. Use Export instead.', { cause: e })
+  }
+}
