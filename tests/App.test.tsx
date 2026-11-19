@@ -20,6 +20,7 @@ describe('App', () => {
     expect(within(nav).getByText('Process Collection')).toBeInTheDocument()
     expect(within(nav).getByText('SEPA XML')).toBeInTheDocument()
     expect(within(nav).getByText('Refund Schedule')).toBeInTheDocument()
+    expect(within(nav).getByText('Move Schedule Dates')).toBeInTheDocument()
     expect(within(nav).getByText('GL Reconciliation')).toBeInTheDocument()
     expect(within(nav).getByText('SL Visualizer')).toBeInTheDocument()
   })
@@ -51,6 +52,12 @@ describe('App', () => {
     render(<App />)
     fireEvent.click(within(getNav()).getByText('Refund Schedule'))
     expect(screen.getByPlaceholderText(/paymentschedule document/i)).toBeInTheDocument()
+  })
+
+  it('switches to Move Schedule Dates tab', () => {
+    render(<App />)
+    fireEvent.click(within(getNav()).getByText('Move Schedule Dates'))
+    expect(screen.getByPlaceholderText(/paymentschedule cosmos document/i)).toBeInTheDocument()
   })
 
   it('switches to GL Reconciliation tab', () => {
