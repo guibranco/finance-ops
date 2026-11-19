@@ -3,6 +3,8 @@ import { ArrowRight } from 'lucide-react'
 import { usePersistedField, USER_EMAIL_KEY } from '../../hooks/usePersistedField'
 import CopyButton from '../CopyButton'
 import RulesGrid from '../RulesGrid'
+import ReportImageActions from '../ReportImageActions'
+import { buildScheduleDatesReport, countMovedItems, describeText, reportFileName } from '../../lib/scheduleDatesReport'
 import {
   isIsoDate,
   shiftSchedule,
@@ -152,10 +154,6 @@ const SAMPLE_SCHEDULE: PaymentScheduleDocument = {
   id: 'Risk-1*4.0-Schedule',
 }
 
-function describeText(value: unknown): string {
-  return typeof value === 'string' || typeof value === 'number' ? String(value) : '—'
-}
-
 type DiffSegment = string | { text: string; cls: string }
 
 // The shift never adds or removes keys, so a line-by-line comparison of the
@@ -295,7 +293,7 @@ export default function ShiftScheduleDates() {
 
   const canRecalculate = !!loaded && isIsoDate(newCoverStart) && newCoverStart !== loaded.CoverStartDate && !!modifiedBy
   const diff = result && loaded ? diffLines(loaded, result.schedule) : null
-  const movedItems = result ? result.items.filter(i => i.periodStart.from !== i.periodStart.to || i.periodEnd.from !== i.periodEnd.to).length : 0
+  const movedItems = result ? countMovedItems(result) : 0
 
   return (
     <div className="flex flex-col gap-5">
@@ -368,8 +366,18 @@ export default function ShiftScheduleDates() {
 
       {result && (
         <div className={card}>
-          <div className={cardTitle}>
-            <span className={cardTitleDotGreen} /> Changes
+          <div className="flex items-start justify-between gap-3 flex-wrap">
+            <div className={cardTitle}>
+              <span className={cardTitleDotGreen} /> Changes
+            </div>
+            {loaded && (
+              <ReportImageActions
+                getReport={() => buildScheduleDatesReport(loaded, result)}
+                fileBaseName={reportFileName(loaded)}
+                exportLabel="Export changes as image"
+                copyTitle="Copy the cover-date changes and item table as a PNG image, ready to paste into Teams, Jira or Confluence"
+              />
+            )}
           </div>
           <div className={statTileRow}>
             <ChangeTile label="Cover Start" change={result.coverStart} />

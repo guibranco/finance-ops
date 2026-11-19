@@ -11,7 +11,7 @@ An internal **Vite + React** toolbox that bundles a handful of small, focused co
 - **⇄ Process Collection:** Generate historic and new collection documents for any target status.
 - **⌁ SEPA XML:** Two generators behind one tab — **Direct Debit** converts the collection JSON into SEPA `pain.008.001.08` XML; **Credit Transfer** turns a CSV of payees (reference, name, IBAN, amount) plus the origin account into SEPA `pain.001.001.09` XML, with column auto-mapping, IBAN/amount validation and a preview before generating.
 - **↩ Refund Schedule:** Generate refund schedule items and collection documents from a payment schedule.
-- **📅 Move Schedule Dates:** Move a payment schedule to a new cover start date — every item period (and `OriginalItem` period) is re-anchored on the new date, `CoverEndDate` follows, `InceptionDate` follows only when it equals the old `CoverStartDate` (renewals keep theirs and get a warning), and `DueDate` is left alone. Shows a before/after table, a document diff and a copyable output.
+- **📅 Move Schedule Dates:** Move a payment schedule to a new cover start date — every item period (and `OriginalItem` period) is re-anchored on the new date, `CoverEndDate` follows, `InceptionDate` follows only when it equals the old `CoverStartDate` (renewals keep theirs and get a warning), and `DueDate` is left alone. Shows a before/after table, a document diff and a copyable output, and exports the changes as an SVG/PNG/JPEG image or copies them to the clipboard as PNG.
 
 Each tool lives in its own tab, works entirely in the browser, and expects no backend connection.
 

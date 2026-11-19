@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
 import ShiftScheduleDates from '../../src/components/tools/ShiftScheduleDates.tsx'
 
@@ -107,7 +107,7 @@ describe('ShiftScheduleDates', () => {
     fillEmail()
     fireEvent.change(newStart(), { target: { value: '2026-07-18' } })
     fireEvent.click(recalcBtn())
-    fireEvent.click(screen.getByRole('button', { name: /copy/i }))
+    fireEvent.click(screen.getByRole('button', { name: /^copy$/i }))
     await waitFor(() => expect(writeText).toHaveBeenCalledWith(output().value))
   })
 
@@ -156,7 +156,7 @@ describe('ShiftScheduleDates', () => {
     expect(screen.queryByTestId('changes-table')).not.toBeInTheDocument()
     expect(screen.queryByTestId('diff-after')).not.toBeInTheDocument()
     expect(output().value).toBe('')
-    expect(screen.queryByRole('button', { name: /copy/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^copy$/i })).not.toBeInTheDocument()
   })
 
   it('rejects a schedule whose AmountDue is not a number instead of crashing', () => {
@@ -164,5 +164,99 @@ describe('ShiftScheduleDates', () => {
     load({ ...SCHEDULE, ScheduleItems: [{ ...SCHEDULE.ScheduleItems[0], AmountDue: '73.19' }] })
     expect(screen.getByTestId('alert-error')).toHaveTextContent('ScheduleItems[0].AmountDue must be a number.')
     expect(newStart()).toBeDisabled()
+  })
+
+  describe('image export', () => {
+    afterEach(() => {
+      vi.restoreAllMocks()
+      vi.unstubAllGlobals()
+    })
+
+    function recalculated() {
+      render(<ShiftScheduleDates />)
+      load()
+      fillEmail()
+      fireEvent.change(newStart(), { target: { value: '2026-07-18' } })
+      fireEvent.click(recalcBtn())
+    }
+
+    function mockRasterizer() {
+      vi.spyOn(HTMLImageElement.prototype, 'src', 'set').mockImplementation(function (this: HTMLImageElement) {
+        setTimeout(() => this.onload?.(new Event('load')))
+      })
+      vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
+        fillRect: vi.fn(),
+        drawImage: vi.fn(),
+      } as unknown as CanvasRenderingContext2D)
+      vi.spyOn(HTMLCanvasElement.prototype, 'toBlob').mockImplementation(
+        (cb: BlobCallback, type?: string) => cb(new Blob(['x'], { type })),
+      )
+    }
+
+    const downloadedName = () =>
+      (vi.mocked(HTMLAnchorElement.prototype.click).mock.contexts[0] as HTMLAnchorElement).download
+
+    it('only shows the export controls once there are changes', () => {
+      render(<ShiftScheduleDates />)
+      load()
+      expect(screen.queryByLabelText(/image format/i)).not.toBeInTheDocument()
+    })
+
+    it('downloads the changes as SVG named after the policy', async () => {
+      recalculated()
+      fireEvent.change(screen.getByLabelText(/image format/i), { target: { value: 'svg' } })
+      fireEvent.click(screen.getByText('Export changes as image'))
+      await waitFor(() => expect(screen.getByText('Exported')).toBeInTheDocument())
+      expect(downloadedName()).toBe('schedule-dates-OUTSTG00000001.svg')
+      const blob = vi.mocked(URL.createObjectURL).mock.calls.at(-1)![0] as Blob
+      const svg = await blob.text()
+      expect(svg).toContain('Move Schedule Dates · OUTSTG00000001')
+      expect(svg).toContain('2027-07-17')
+      expect(svg).toContain('Review before saving:')
+    })
+
+    it.each([['png', 'png'], ['jpeg', 'jpg']])('downloads %s as .%s', async (format, ext) => {
+      mockRasterizer()
+      recalculated()
+      fireEvent.change(screen.getByLabelText(/image format/i), { target: { value: format } })
+      fireEvent.click(screen.getByText('Export changes as image'))
+      await waitFor(() => expect(screen.getByText('Exported')).toBeInTheDocument())
+      expect(downloadedName()).toBe(`schedule-dates-OUTSTG00000001.${ext}`)
+    })
+
+    it('shows an error when the image cannot be rendered', async () => {
+      vi.spyOn(HTMLImageElement.prototype, 'src', 'set').mockImplementation(function (this: HTMLImageElement) {
+        setTimeout(() => this.onerror?.(new Event('error')))
+      })
+      recalculated()
+      fireEvent.click(screen.getByText('Export changes as image'))
+      await waitFor(() => expect(screen.getByTestId('image-error')).toHaveTextContent(/could not render/i))
+      expect(screen.getByText('Export changes as image').closest('button')).not.toBeDisabled()
+    })
+
+    it('copies the changes to the clipboard as PNG', async () => {
+      mockRasterizer()
+      class FakeClipboardItem {
+        items: Record<string, Promise<Blob>>
+        constructor(items: Record<string, Promise<Blob>>) { this.items = items }
+      }
+      vi.stubGlobal('ClipboardItem', FakeClipboardItem)
+      const write = vi.fn(async (items: FakeClipboardItem[]) => { await items[0].items['image/png'] })
+      Object.defineProperty(navigator, 'clipboard', { value: { write, writeText: vi.fn() }, configurable: true })
+
+      recalculated()
+      fireEvent.click(screen.getByText('Copy image'))
+      await waitFor(() => expect(screen.getByText('Copied')).toBeInTheDocument())
+      const blob = await write.mock.calls[0][0][0].items['image/png']
+      expect(blob.type).toBe('image/png')
+      expect(HTMLAnchorElement.prototype.click).not.toHaveBeenCalled()
+    })
+
+    it('shows an error when the browser cannot copy images', async () => {
+      recalculated()
+      fireEvent.click(screen.getByText('Copy image'))
+      await waitFor(() => expect(screen.getByTestId('image-error')).toHaveTextContent(/can't copy images/i))
+      expect(screen.getByText('Copy image')).toBeInTheDocument()
+    })
   })
 })
