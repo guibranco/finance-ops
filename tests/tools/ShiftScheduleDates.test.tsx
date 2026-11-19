@@ -137,4 +137,32 @@ describe('ShiftScheduleDates', () => {
     expect(output().value).toBe('')
     expect(screen.queryByTestId('changes-table')).not.toBeInTheDocument()
   })
+
+  it.each([
+    ['invalid JSON', '{ bad'],
+    ['a document that fails validation', JSON.stringify({ ScheduleItems: [] })],
+  ])('clears a previous result when a replacement load fails with %s', (_, replacement) => {
+    render(<ShiftScheduleDates />)
+    load()
+    fillEmail()
+    fireEvent.change(newStart(), { target: { value: '2026-07-18' } })
+    fireEvent.click(recalcBtn())
+    expect(screen.getByTestId('changes-table')).toBeInTheDocument()
+
+    fireEvent.change(input(), { target: { value: replacement } })
+    fireEvent.click(screen.getByText('Load Schedule'))
+
+    expect(screen.getByTestId('alert-error')).toBeInTheDocument()
+    expect(screen.queryByTestId('changes-table')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('diff-after')).not.toBeInTheDocument()
+    expect(output().value).toBe('')
+    expect(screen.queryByRole('button', { name: /copy/i })).not.toBeInTheDocument()
+  })
+
+  it('rejects a schedule whose AmountDue is not a number instead of crashing', () => {
+    render(<ShiftScheduleDates />)
+    load({ ...SCHEDULE, ScheduleItems: [{ ...SCHEDULE.ScheduleItems[0], AmountDue: '73.19' }] })
+    expect(screen.getByTestId('alert-error')).toHaveTextContent('ScheduleItems[0].AmountDue must be a number.')
+    expect(newStart()).toBeDisabled()
+  })
 })

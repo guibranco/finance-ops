@@ -85,11 +85,35 @@ describe('validateSchedule', () => {
 
   it('reports missing cover dates and bad items', () => {
     const errors = validateSchedule({ CoverStartDate: 'x', ScheduleItems: [{ PeriodStartDate: '2026-01-01' }, null] })
-    expect(errors).toEqual([
+    expect(errors).toEqual(expect.arrayContaining([
       expect.stringContaining('CoverStartDate'),
       expect.stringContaining('CoverEndDate'),
-      expect.stringContaining('ScheduleItems[0]'),
-      expect.stringContaining('ScheduleItems[1]'),
+      'ScheduleItems[0] has an invalid PeriodStartDate or PeriodEndDate.',
+      'ScheduleItems[1] must be an object.',
+    ]))
+  })
+
+  it('rejects a non-numeric or missing AmountDue', () => {
+    const doc = monthlySchedule() as unknown as { ScheduleItems: Record<string, unknown>[] }
+    doc.ScheduleItems[0].AmountDue = '10'
+    delete doc.ScheduleItems[1].AmountDue
+    doc.ScheduleItems[2].AmountDue = Number.NaN
+    expect(validateSchedule(doc)).toEqual([
+      'ScheduleItems[0].AmountDue must be a number.',
+      'ScheduleItems[1].AmountDue must be a number.',
+      'ScheduleItems[2].AmountDue must be a number.',
+    ])
+  })
+
+  it('rejects non-string Id, CollectionType and DueDate', () => {
+    const doc = monthlySchedule() as unknown as { ScheduleItems: Record<string, unknown>[] }
+    doc.ScheduleItems[0].Id = 1
+    doc.ScheduleItems[0].CollectionType = null
+    delete doc.ScheduleItems[0].DueDate
+    expect(validateSchedule(doc)).toEqual([
+      'ScheduleItems[0].Id must be a string.',
+      'ScheduleItems[0].CollectionType must be a string.',
+      'ScheduleItems[0].DueDate must be a string.',
     ])
   })
 
@@ -187,6 +211,23 @@ describe('shiftSchedule', () => {
     }
     const r = shiftSchedule(doc, '2026-02-01')
     expect(r.schedule.ScheduleItems[0].PeriodStartDate).toBe('2026-02-28')
+  })
+
+  it('warns about a mid-period OriginalItem start under a boundary item', () => {
+    const doc = monthlySchedule()
+    doc.ScheduleItems[2].OriginalItem = item('nested', '2026-11-19', '2026-11-23')
+    const r = shiftSchedule(doc, '2026-07-18')
+    expect(r.schedule.ScheduleItems[2].OriginalItem?.PeriodStartDate).toBe('2026-11-13')
+    expect(r.warnings).toContain(
+      'Item 3 (oct) → OriginalItem: mid-period start 2026-11-19 moved to 2026-11-13 keeping its day offset; amounts were not recalculated.',
+    )
+    expect(r.warnings.some(w => w.startsWith('Item 3 (oct):'))).toBe(false)
+  })
+
+  it('does not warn for boundary-only items', () => {
+    const doc = monthlySchedule()
+    doc.ScheduleItems.splice(3, 1)
+    expect(shiftSchedule(doc, '2026-07-18').warnings).toEqual([])
   })
 
   it('leaves dates outside the cover range unchanged and warns', () => {

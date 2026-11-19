@@ -139,21 +139,41 @@ function mapEndDate(date: string, a: Anchors): DateChange {
   return mapStartDate(date, a)
 }
 
-function shiftItem(item: ScheduleItem, a: Anchors): { item: ScheduleItem; start: DateChange; end: DateChange; original: ItemChange['originalItem'] } {
+interface ShiftedItem {
+  item: ScheduleItem
+  start: DateChange
+  end: DateChange
+  original: ItemChange['originalItem']
+  warnings: string[]
+}
+
+// Re-anchors one item and, recursively, its OriginalItem chain. Warnings carry
+// the item's path (e.g. "Item 7 (id) → OriginalItem") so nested mid-period or
+// out-of-range dates are flagged as clearly as top-level ones.
+function shiftItem(item: ScheduleItem, a: Anchors, label: string): ShiftedItem {
   const start = mapStartDate(item.PeriodStartDate, a)
   const end = mapEndDate(item.PeriodEndDate, a)
+  const warnings: string[] = []
+  if (start.kind === 'mid-period') {
+    warnings.push(`${label}: mid-period start ${start.from} moved to ${start.to} keeping its day offset; amounts were not recalculated.`)
+  }
+  if (start.kind === 'outside-cover' || end.kind === 'outside-cover') {
+    warnings.push(`${label}: period ${item.PeriodStartDate} → ${item.PeriodEndDate} falls outside the old cover dates; out-of-range dates were left unchanged.`)
+  }
   let original: ItemChange['originalItem'] = null
   let originalItem = item.OriginalItem
   if (originalItem && isIsoDate(originalItem.PeriodStartDate) && isIsoDate(originalItem.PeriodEndDate)) {
-    const shifted = shiftItem(originalItem, a)
+    const shifted = shiftItem(originalItem, a, `${label} → OriginalItem`)
     originalItem = shifted.item
     original = { periodStart: shifted.start, periodEnd: shifted.end }
+    warnings.push(...shifted.warnings)
   }
   return {
     item: { ...item, PeriodStartDate: start.to, PeriodEndDate: end.to, OriginalItem: originalItem },
     start,
     end,
     original,
+    warnings,
   }
 }
 
@@ -169,8 +189,18 @@ export function validateSchedule(doc: unknown): string[] {
   } else {
     d.ScheduleItems.forEach((raw, i) => {
       const item = raw as Record<string, unknown> | null
-      if (!item || !isIsoDate(item.PeriodStartDate) || !isIsoDate(item.PeriodEndDate)) {
+      if (!item || typeof item !== 'object') {
+        errors.push(`ScheduleItems[${i}] must be an object.`)
+        return
+      }
+      if (!isIsoDate(item.PeriodStartDate) || !isIsoDate(item.PeriodEndDate)) {
         errors.push(`ScheduleItems[${i}] has an invalid PeriodStartDate or PeriodEndDate.`)
+      }
+      if (typeof item.AmountDue !== 'number' || !Number.isFinite(item.AmountDue)) {
+        errors.push(`ScheduleItems[${i}].AmountDue must be a number.`)
+      }
+      for (const field of ['Id', 'CollectionType', 'DueDate'] as const) {
+        if (typeof item[field] !== 'string') errors.push(`ScheduleItems[${i}].${field} must be a string.`)
       }
     })
   }
@@ -207,15 +237,9 @@ export function shiftSchedule(source: PaymentScheduleDocument, newCoverStart: st
 
   const items: ItemChange[] = source.ScheduleItems.map((item, index) => {
     // Shift the cloned item so the output never shares nested objects with the input.
-    const shifted = shiftItem(schedule.ScheduleItems[index], a)
+    const shifted = shiftItem(schedule.ScheduleItems[index], a, `Item ${index + 1} (${item.Id})`)
     schedule.ScheduleItems[index] = shifted.item
-    const label = `Item ${index + 1} (${item.Id})`
-    if (shifted.start.kind === 'mid-period') {
-      warnings.push(`${label}: mid-period start ${shifted.start.from} moved to ${shifted.start.to} keeping its day offset; amounts were not recalculated.`)
-    }
-    if (shifted.start.kind === 'outside-cover' || shifted.end.kind === 'outside-cover') {
-      warnings.push(`${label}: period ${item.PeriodStartDate} → ${item.PeriodEndDate} falls outside the old cover dates; out-of-range dates were left unchanged.`)
-    }
+    warnings.push(...shifted.warnings)
     return {
       index,
       id: item.Id,

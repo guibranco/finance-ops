@@ -235,6 +235,10 @@ export default function ShiftScheduleDates() {
   function applyLoaded(doc: PaymentScheduleDocument) {
     setLoaded(doc)
     setNewCoverStart(doc.CoverStartDate)
+    resetResult()
+  }
+
+  function resetResult() {
     setResult(null)
     setOutput('')
     setGenError('')
@@ -247,12 +251,14 @@ export default function ShiftScheduleDates() {
       parsed = JSON.parse(inputJson)
     } catch (e) {
       setLoaded(null)
+      resetResult()
       setLoadError('Invalid JSON: ' + (e as Error).message)
       return
     }
     const errors = validateSchedule(parsed)
     if (errors.length) {
       setLoaded(null)
+      resetResult()
       setLoadError(errors.join(' '))
       return
     }
