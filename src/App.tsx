@@ -1,6 +1,7 @@
 import { useState, type ComponentType } from 'react'
 import {
   ArrowLeftRight,
+  CalendarClock,
   FileSearch,
   LayoutGrid,
   RefreshCw,
@@ -14,6 +15,7 @@ import CollectionItem2ShadowLedger from './components/tools/CollectionItem2Shado
 import UpdateCollectionStatus from './components/tools/UpdateCollectionStatus'
 import SepaXmlGenerator from './components/tools/SepaXmlGenerator'
 import PaymentSchedule2Refund from './components/tools/PaymentSchedule2Refund'
+import ShiftScheduleDates from './components/tools/ShiftScheduleDates'
 import ShadowLedgerReconciliation from './components/tools/ShadowLedgerReconciliation'
 import ShadowLedgerVisualizer from './components/tools/ShadowLedgerVisualizer'
 import SepaFileVisualizer from './components/tools/SepaFileVisualizer'
@@ -87,6 +89,13 @@ const TOOLS: Tool[] = [
     desc: 'Generate refund schedule items and collection documents',
   },
   {
+    id: 'schedule-dates',
+    label: 'Move Schedule Dates',
+    icon: CalendarClock,
+    component: ShiftScheduleDates,
+    desc: 'Move a payment schedule to a new cover start date and re-anchor every period and the cover end date',
+  },
+  {
     id: 'gl-reconcile',
     label: 'GL Reconciliation',
     icon: Scale,
@@ -141,7 +150,7 @@ export default function App() {
         </div>
         <div className={headerBadge}>
           <span className={headerBadgeDot} />
-          Internal · 8 tools
+          Internal · {TOOLS.length} tools
         </div>
       </header>
 
